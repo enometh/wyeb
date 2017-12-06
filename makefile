@@ -2,6 +2,8 @@ PREFIX ?= /usr
 EXTENSION_DIR ?= $(PREFIX)/lib/wyebrowser
 DISTROURI ?= https://www.archlinux.org/
 DISTRONAME ?= "Arch Linux"
+CFLAGS += -Wno-parentheses -ggdb
+DEBUG ?= 1
 ifeq ($(DEBUG), 1)
 	CFLAGS += -Wall -Wno-deprecated-declarations
 else
