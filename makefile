@@ -4,6 +4,8 @@ WEBKIT ?= webkit2gtk-$(WEBKITVER)
 EXTENSION_DIR ?= $(PREFIX)/lib/wyebrowser
 DISTROURI ?= https://archlinux.org/
 DISTRONAME ?= "Arch Linux"
+CFLAGS += -Wno-parentheses -ggdb
+DEBUG ?= 1
 
 ifneq ($(WEBKITVER), 4.0)
 	VERDIR=/$(WEBKITVER)
