@@ -4791,7 +4791,7 @@ void ipccb(const char *line)
 int main(int argc, char **argv)
 {
 #if DEBUG
-	g_log_set_always_fatal(G_LOG_LEVEL_CRITICAL);
+//	g_log_set_always_fatal(G_LOG_LEVEL_CRITICAL);
 	DD(This bin is compiled with DEBUG)
 #endif
 
