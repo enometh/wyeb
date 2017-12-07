@@ -493,6 +493,8 @@ static void showmsg(Win *win, const char *msg)
 //com
 static void send(Win *win, Coms type, const char *args)
 {
+	fprintf(stderr, "main: send (%p,%c,%s)\n",
+		win,type,args);
 	WebKitUserMessage* msg = webkit_user_message_new(
 		sfree(g_strdup_printf("0:%c:%s", type, args ?: "")) , NULL);
 	webkit_web_view_send_message_to_page(win->kit, msg, NULL, NULL, NULL);
@@ -509,6 +511,7 @@ typedef struct {
 } Send;
 static gboolean senddelaycb(Send *s)
 {
+	fprintf(stderr,"senddelaycb s=%p=(%p,%u,%s)\n", s, s->win, s->type, s->args);
 	if (isin(wins, s->win))
 		send(s->win, s->type, s->args);
 	g_free(s->args);
@@ -518,6 +521,9 @@ static gboolean senddelaycb(Send *s)
 static void senddelay(Win *win, Coms type, char *args) //args is eaten
 {
 	Send s = {win, type, args};
+	fprintf(stderr,"senddelay: win->maychanged=%d type=%d args=%p Send=%p\n",
+		win->maychanged, type, args, &s);
+
 	g_timeout_add(40, (GSourceFunc)senddelaycb, g_memdup(&s, sizeof(Send)));
 }
 
@@ -2255,6 +2261,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	if (action == NULL) return false;
 	char **agv = NULL;
 
+	fprintf(stderr, "main run: action=%s\n", action);
 	Z("quitall"     , gtk_main_quit())
 	Z("new"         , win = newwin(arg, NULL, NULL, 0))
 	Z("plugto"      , plugto = atol(exarg ?: arg ?: "0");
@@ -3486,6 +3493,8 @@ static gboolean keycb(GtkWidget *w, GdkEventKey *ek, Win *win)
 	keyr = true;
 	char *action = ke2name(win, ek);
 
+	if (action) fprintf(stderr,"keycb: action=%s\n", action);
+
 	if (action && !strcmp(action, "tonormal"))
 	{
 		if (win->lastx || win->lasty)
@@ -4605,6 +4614,7 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 
 		webkit_web_context_set_web_extensions_initialization_user_data(
 				ctx, g_variant_new_string(udata));
+		fprintf(stderr,"main newwin: initializing userdata=%s\n", udata);
 		g_free(udata);
 
 #if DEBUG
@@ -4767,6 +4777,8 @@ static void runline(const char *line, char *cdir, char *exarg)
 	char **args = g_strsplit(line, ":", 3);
 	Win *win = !strcmp(args[0], "0") ? LASTWIN : winbyid(args[0]);
 
+	fprintf(stderr,"main ippcb runline: args[0]=%s args[1]=%s args[2]=%s\n",
+		args[0], args[1], args[2]);
 	_run(win, args[1], !*args[2] ? NULL : args[2], cdir, exarg);
 
 	g_strfreev(args);

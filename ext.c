@@ -342,6 +342,7 @@ static void send(Page *page, char *action, const char *arg)
 	WebKitUserMessage* msg = webkit_user_message_new(
 		sfree(g_strdup_printf("0:%s:%s", action, arg ?: "")) , NULL);
 	webkit_web_page_send_message_to_view(page->kit, msg, NULL, NULL, NULL);
+	fprintf(stderr,"ext send: page=%p action=%s, arg=%s\n", page, action, arg);
 }
 static bool isins(const char **ary, char *val)
 {
@@ -1640,6 +1641,8 @@ static void halfscroll(Page *page, bool d)
 static gboolean msgcb(WebKitWebPage *kp, WebKitUserMessage *msg, Page *page)
 {
 	char **args = g_strsplit(webkit_user_message_get_name(msg), ":", 3);
+	fprintf(stderr, "ext msgcb: args[0]=%s arg[1]=%s (type) args[2]=%s (arg)\n",
+		args[0], args[1], args[2]);
 
 	Coms type = *args[1];
 	char *arg = args[2];
