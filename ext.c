@@ -343,6 +343,7 @@ static void send(Page *page, char *action, const char *arg)
 	ipcsend("main", sfree(g_strdup_printf(
 		"%"G_GUINT64_FORMAT":%s:%s",
 		webkit_web_page_get_id(page->kit), action, arg ?: "")));
+	fprintf(stderr,"ext send: page=%p action=%s, arg=%s\n", page, action, arg);
 }
 static bool isins(const char **ary, char *val)
 {
@@ -1638,6 +1639,8 @@ static void halfscroll(Page *page, bool d)
 void ipccb(const char *line)
 {
 	char **args = g_strsplit(line, ":", 3);
+	fprintf(stderr, "ext ipccb: args[0]=%s arg[1]=%s args[2]=%s\n",
+		args[0], args[1], args[2]);
 
 	Page *page = NULL;
 	long lid = atol(args[0]);

@@ -489,7 +489,9 @@ static void send(Win *win, Coms type, char *args)
 
 	static bool alerted;
 
-	for (GSList *next = win->ipcids; next; next = next->next)
+	for (GSList *next = win->ipcids; next; next = next->next) {
+		fprintf(stderr, "main send: calling ipcsend(%s, %s)\n",
+			(char *) next->data, arg);
 		if (!ipcsend(next->data, arg))
 		{
 			g_free(next->data);
@@ -502,6 +504,7 @@ static void send(Win *win, Coms type, char *args)
 						"Make sure ext.so is in "EXTENSION_DIR".");
 			}
 		}
+	}
 }
 static void sendeach(Coms type, char *args)
 {
@@ -521,6 +524,7 @@ typedef struct {
 } Send;
 static gboolean senddelaycb(Send *s)
 {
+	fprintf(stderr,"senddelaycb s=%p=(%p,%u,%s)\n", s, s->win, s->type, s->args);
 	if (isin(wins, s->win))
 		send(s->win, s->type, s->args);
 	g_free(s->args);
@@ -530,6 +534,9 @@ static gboolean senddelaycb(Send *s)
 static void senddelay(Win *win, Coms type, char *args) //args is eaten
 {
 	Send s = {win, type, args};
+	fprintf(stderr,"senddelay: win->pageid=%s type=%d args=%p Send=%p\n",
+		win->pageid, type, args, &s);
+
 	g_timeout_add(40, (GSourceFunc)senddelaycb, g_memdup(&s, sizeof(Send)));
 }
 
@@ -2294,6 +2301,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	if (action == NULL) return false;
 	char **agv = NULL;
 
+	fprintf(stderr, "main run: action=%s\n", action);
 	Z("quitall"     , gtk_main_quit())
 	Z("new"         , win = newwin(arg, NULL, NULL, 0))
 	Z("plugto"      , plugto = atol(exarg ?: arg ?: "0");
@@ -3525,6 +3533,8 @@ static gboolean keycb(GtkWidget *w, GdkEventKey *ek, Win *win)
 	keyr = true;
 	char *action = ke2name(win, ek);
 
+	if (action) fprintf(stderr,"keycb: action=%s\n", action);
+
 	if (action && !strcmp(action, "tonormal"))
 	{
 		if (win->lastx || win->lasty)
@@ -4638,6 +4648,7 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 
 		webkit_web_context_set_web_extensions_initialization_user_data(
 				ctx, g_variant_new_string(udata));
+		fprintf(stderr,"main newwin: initializing userdata=%s\n", udata);
 		g_free(udata);
 
 #if DEBUG
@@ -4802,6 +4813,9 @@ static void runline(const char *line, char *cdir, char *exarg)
 
 	char *arg = args[2];
 	if (!*arg) arg = NULL;
+
+	fprintf(stderr,"main ipccb: args[0]=%s args[1]=%s args[2]=%s\n",
+		args[0], args[1], args[2]);
 
 	if (!strcmp(args[0], "0"))
 		_run(LASTWIN, args[1], arg, cdir, exarg);
