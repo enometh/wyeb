@@ -2192,6 +2192,8 @@ static Keybind dkeys[]= {
 	{"edituri"       , 'O', 0, "Edit arg or focused link or current page's URI"},
 	{"editurinew"    , 'W', 0},
 
+	{"inspector"	 , 'O', GDK_CONTROL_MASK},
+
 //	{"showsource"    , 'S', 0}, //not good
 	{"showhelp"      , ':', 0},
 	{"showhistory"   , 'M', 0},
@@ -2636,6 +2638,15 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	Z("wbnoreload", wbreload = false) //internal
 	Z("addwhitelist", send(win, Cwhite, "white"))
 	Z("addblacklist", send(win, Cwhite, "black"))
+
+	Z("inspector",
+	  WebKitWebInspector *inspector =
+	  webkit_web_view_get_inspector(win->kit);
+	  if (webkit_web_inspector_is_attached(inspector))
+		  webkit_web_inspector_close(inspector);
+	  else
+		  webkit_web_inspector_show(inspector);
+		)
 
 	Z("textlink", textlinktry(win));
 	Z("raise"   , present(arg ? winbyid(arg) ?: win : win))
