@@ -3961,6 +3961,9 @@ static gboolean policycb(
 		//it changes uri of wins and can't recover.
 		webkit_policy_decision_download(dec);
 		return true;
+	} else 	if (type == WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION) {
+		webkit_policy_decision_use(dec);
+		return true;
 	}
 
 	if (type != WEBKIT_POLICY_DECISION_TYPE_RESPONSE)
