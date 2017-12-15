@@ -4,7 +4,7 @@ WEBKIT ?= webkit2gtk-$(WEBKITVER)
 EXTENSION_DIR ?= $(PREFIX)/lib/wyebrowser
 DISTROURI ?= https://archlinux.org/
 DISTRONAME ?= "Arch Linux"
-CFLAGS += -Wno-parentheses -ggdb
+CFLAGS += -Wno-parentheses -ggdb -lX11
 DEBUG ?= 1
 
 ifneq ($(WEBKITVER), 4.0)
@@ -18,7 +18,7 @@ endif
 
 all: wyeb ext.so
 
-wyeb: main.c general.c makefile
+wyeb: main.c general.c makefile surfprop.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< \
 		`pkg-config --cflags --libs gtk+-3.0 glib-2.0 $(WEBKIT)` \
 		-DEXTENSION_DIR=\"$(EXTENSION_DIR)$(VERDIR)\" \
@@ -39,6 +39,7 @@ install: all
 	install -Dm755 ext.so   $(DESTDIR)$(EXTENSION_DIR)$(VERDIR)/ext.so
 	install -Dm644 wyeb.png   $(DESTDIR)$(PREFIX)/share/pixmaps/wyeb.png
 	install -Dm644 wyeb.desktop $(DESTDIR)$(PREFIX)/share/applications/wyeb.desktop
+	install -Dm755 omnihist-wyeb $(DESTDIR)$(PREFIX)/bin/omnihist-wyeb
 
 uninstall:
 	rm -f  $(PREFIX)/bin/wyeb
