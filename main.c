@@ -1275,6 +1275,7 @@ static void tonormal(Win *win)
 	update(win);
 }
 
+static void eval_javascript(Win *win, const char *script);//declaration
 
 //@funcs for actions
 static bool run(Win *win, char* action, const char *arg); //declaration
@@ -1321,7 +1322,7 @@ static void _openuri(Win *win, const char *str, Win *caller)
 		setent(win, str ?: "");
 
 	if (g_str_has_prefix(str, "javascript:")) {
-		webkit_web_view_run_javascript(win->kit, str + 11, NULL, NULL, NULL);
+		eval_javascript(win, str+11);
 		return;
 	}
 
@@ -4153,6 +4154,79 @@ static void setspawn(Win *win, char *key)
 	char *path = sfree(g_build_filename(sfree(path2conf("menu")), fname, NULL));
 	envspawn(spawnp(win, "", NULL , path, true) , false, NULL, NULL, 0);
 }
+
+static void
+web_view_javascript_finished(GObject      *object,
+			     GAsyncResult *result,
+			     gpointer      user_data)
+{
+	WebKitJavascriptResult *js_result;
+	JSValueRef              value;
+	JSGlobalContextRef      context;
+	GError                 *error = NULL;
+
+	js_result = webkit_web_view_run_javascript_finish(WEBKIT_WEB_VIEW(object), result, &error);
+	if (!js_result) {
+		if (error->message)
+			g_warning("Error running javascript: <<%s>>", error->message);
+		else g_print("Javascript Result: null\n");
+		g_error_free(error);
+		return;
+	}
+	context = webkit_javascript_result_get_global_context(js_result);
+	value = webkit_javascript_result_get_value(js_result);
+	{
+		JSStringRef js_str_value;
+		char       *str_value;
+		gsize       str_length;
+
+		js_str_value = JSValueToStringCopy(context, value, NULL);
+		str_length = JSStringGetMaximumUTF8CStringSize(js_str_value);
+		str_value = (char *)g_malloc(str_length);
+		JSStringGetUTF8CString(js_str_value, str_value, str_length);
+		JSStringRelease(js_str_value);
+//		g_print ("Script result: %s\n", str_value);
+		g_free(str_value);
+	}
+//	if (JSValueIsString (context, value)) {
+//	} else {
+//		g_warning ("Error running javascript: unexpected return value");
+//	}
+	webkit_javascript_result_unref(js_result);
+}
+
+static void
+eval_javascript(Win *win, const char *script)
+{
+	WebKitSettings *s = webkit_web_view_get_settings(win->kit);
+	gboolean orig = webkit_settings_get_enable_javascript(s);
+	if (!orig)
+		webkit_settings_set_enable_javascript(s, TRUE);
+	webkit_web_view_run_javascript(win->kit, script, NULL, web_view_javascript_finished, NULL);
+	if (!orig)
+		webkit_settings_set_enable_javascript(s, FALSE);
+}
+
+static char *resolvepath(const char *path)
+{
+	if (path[0] == '~' && (path[1] == '/' || path[1] == '\0'))
+		return g_build_filename(g_get_home_dir(), path+1, NULL);
+	return g_build_filename(path, NULL);
+}
+
+static void
+surfrunscript(Win *win)
+{
+	char *scriptfile = "~/.surf/script.js";
+	char *script = 0;
+	gsize l;
+	static char *p = 0;
+	if (!p) p =resolvepath(scriptfile); /* XXX not freed */
+	if (g_file_get_contents(p, &script, &l, NULL) && l)
+		eval_javascript(win, script);
+	g_free(script);
+}
+
 static void loadcb(WebKitWebView *k, WebKitLoadEvent event, Win *win)
 {
 	win->crashed = false;
@@ -4228,6 +4302,8 @@ static void loadcb(WebKitWebView *k, WebKitLoadEvent event, Win *win)
 			setspawn(win, "onloadedmenu");
 			send(win, Con, "f");
 		}
+
+		surfrunscript(win);
 
 		win->progd = 1;
 		drawprogif(win, true);
