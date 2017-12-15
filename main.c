@@ -144,6 +144,12 @@ typedef struct _WP {
 	guint   msgfunc;
 
 	bool cancelcontext;
+	bool cancelbtn1r;
+	bool cancelmdlr;
+
+	Window xid;
+	char sxid[64];
+	Display *dpy;
 } Win;
 
 struct _Spawn {
@@ -191,6 +197,8 @@ static void _kitprops(bool set, GObject *obj, GKeyFile *kf, char *group);
 #else
 #define FORDISP(s) s
 #endif
+
+#include "surfprop.h"
 
 static char *usage =
 	"usage: "APP" [[[suffix] action|\"\"] uri|arg|\"\"]\n"
@@ -366,6 +374,10 @@ static gboolean histcb(Win *win)
 {
 	if (!isin(wins, win)) return false;
 	win->histcb = 0;
+
+	if (!win) return false;
+	if (strcmp(URI(win), getatom(win, atomGo)))
+		surfaddhist(URI(win));
 
 #define MAXSIZE 22222
 	static int ci;
@@ -1278,6 +1290,7 @@ static void _openuri(Win *win, const char *str, Win *caller)
 		g_str_has_prefix(str, "blob:") ||
 		g_str_has_prefix(str, "about:")
 	) {
+		setatom(win, atomUri, URI(win));
 		webkit_web_view_load_uri(win->kit, str);
 		return;
 	}
@@ -2193,6 +2206,8 @@ static Keybind dkeys[]= {
 	{"editurinew"    , 'W', 0},
 
 	{"inspector"	 , 'O', GDK_CONTROL_MASK},
+	{"surfgo"	 , 'g', GDK_CONTROL_MASK},
+	{"surffind"	 , '/', GDK_CONTROL_MASK},
 
 //	{"showsource"    , 'S', 0}, //not good
 	{"showhelp"      , ':', 0},
@@ -2647,6 +2662,10 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	  else
 		  webkit_web_inspector_show(inspector);
 		)
+
+	xwinid = win->sxid;
+	Z("surffind", SETPROP("_SURF_FIND", "find", "Find:"))
+	Z("surfgo", SETPROP("_SURF_URI", "open", "Go:"))
 
 	Z("textlink", textlinktry(win));
 	Z("raise"   , present(arg ? winbyid(arg) ?: win : win))
@@ -4113,6 +4132,7 @@ static void loadcb(WebKitWebView *k, WebKitLoadEvent event, Win *win)
 	switch (event) {
 	case WEBKIT_LOAD_STARTED:
 		//D(WEBKIT_LOAD_STARTED %s, URI(win))
+		setatom(win, atomUri, URI(win));
 		histperiod(win);
 		if (tlwin == win) tlwin = NULL;
 		win->scheme = false;
@@ -4142,6 +4162,7 @@ static void loadcb(WebKitWebView *k, WebKitLoadEvent event, Win *win)
 		break;
 	case WEBKIT_LOAD_REDIRECTED:
 		//D(WEBKIT_LOAD_REDIRECTED %s, URI(win))
+		setatom(win, atomUri, URI(win));
 		resetconf(win, NULL, 0);
 		send(win, Cstart, NULL);
 
@@ -4809,6 +4830,22 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 	gtk_widget_grab_focus(win->kitw);
 
 	SIGA(G_OBJECT(win->canvas = win->kitw), "draw", drawcb, win);
+
+	win->xid = gdk_x11_window_get_xid(gtk_widget_get_window
+					  (GTK_WIDGET(win->win)));
+	snprintf(win->sxid, sizeof(win->sxid)/sizeof((win->sxid)[0]),
+		 "%lu", win->xid);
+	win->dpy = gdk_x11_get_default_xdisplay();
+	gdk_window_set_events(gtk_widget_get_window(GTK_WIDGET(win->win)),
+			      GDK_ALL_EVENTS_MASK);
+	gdk_window_add_filter(gtk_widget_get_window(GTK_WIDGET(win->win)),
+			      processx, win);
+
+	if (atomGo == 0) initatoms(win);
+
+	if (!cbwin)
+		_openuri(win, uri, caller);
+
 	present(back && LASTWIN ? LASTWIN : win);
 
 	if (!cbwin)
@@ -4916,6 +4953,8 @@ int main(int argc, char **argv)
 	//start main
 	histdir = g_build_filename(
 			g_get_user_cache_dir(), fullname, "history", NULL);
+
+	setenv("HISTFN", histdir, false); /* XXX user can override */
 	g_set_prgname(fullname);
 	gtk_init(0, NULL);
 	checkconf(NULL);
