@@ -1,0 +1,103 @@
+#!/bin/bash
+
+declare -g HISTFN=${HISTFN:-~/.surf/history}
+declare -g NITEMS=5
+
+# history files are named ${HISTFN}_${propname} and have 3 fields:
+# count last-timestamp item
+#
+# addhist item propname
+# goto windowid propname prompt
+#
+#	read the history file for $propname and present a choice of
+#	items sorted by last timestamp.  update the history file
+
+urlencode() {
+	printf %s "$1" | od -t x1 -An | tr -d '\n' | tr ' ' '%'
+}
+
+trim() {
+	echo "$1" | sed 's/^[ ]*//;s/[ ]*$//'
+}
+
+addhist() {
+	[ -z "$1" ] && return
+	[ -z "$2" ] && return
+
+	local -r u="$1"
+	local -r prop="$2"
+	local -r tstamp="$(date +%s)"
+
+	local n="$(sed -n "s|^\([0-9]\+\) [0-9]\+ ${u}$|\1|p" "${HISTFN}_${prop}")"
+	if [ -z "$n" ]; then
+		echo "1 $tstamp ${u}" >> "${HISTFN}_${prop}"
+	else
+		n="$(echo $n+1|bc)"
+		un="$(echo "$u" |sed 's/&/\\&/g')"
+		sed -i "s|^\([0-9]\+\) [0-9]\+ ${u}$|${n} ${tstamp} ${un}|" "${HISTFN}_${prop}"
+	fi
+}
+
+geturi() {
+	local -r s="$1"
+	local -r host="$(echo "$s" | sed 's,^\(.*://\|\)\([^/:]*\).*,\2,')"
+	local -r scheme="$(echo "$s" |cut -sd: -f1)"
+	local search uri
+
+	# search only when no scheme or it's http(s)
+	if [ -z "$scheme" -o  "$scheme" = "http" -o "$scheme" = "https" ]; then
+		search="$(nc -4dw 1 "$host" 80 2> /dev/null; echo $?)"
+	else
+		search=0
+	fi
+
+	if [ "$search" -ne 0 ]; then
+		# enjoy !bangs
+		uri="https://duckduckgo.com/?q="
+		uri+="$(urlencode "$s")"
+	else
+		uri="$s"
+	fi
+	echo "$uri"
+}
+
+goto() {
+	local -r xid="$1"	# wyeb "suffix"
+	local -r wyebsuffix="$xid"
+	local -r readprop="$2"
+	local -r prop="$3"
+	local -r promptvar="$4"
+	local uri s u
+
+	# initialize u from readprop. if it is in the history file,
+	# ignore it, otherwise present it as the first choice to
+	# dmenu, along with the contents of the history file
+	#
+	u="$(xprop -id "$xid" "$readprop" | awk -F '"' '{print $2}')"
+	if [ -n "$u" -a -n "$(sed -n "s|^\([0-9]\+\) [0-9]\+ ${u}$|\1|p" "${HISTFN}_${prop}")" ]; then
+		u=
+	fi
+
+	s="$(([ -n "$u" ] && echo "$u"; cat "${HISTFN}_${prop}" | sort -rn -t' ' -k2,2 -k1,1 | cut -d' ' -f3- ) | dmenu -w "$xid" -p "${promptvar:-FOO}" -i -l "$NITEMS")"
+	s="$(trim "$s")"
+	[ -z "$s" ] && return
+
+	addhist "$s" "$prop"
+	# uri="$(geturi "$s")"
+	uri="$s"
+
+	wyeb // "$prop" "$uri"
+#	wyeb "$wyebsuffix" "$prop" "$uri"
+	return
+
+	[ -z "$xid" -o -z "$prop" -o -z "$uri" ] && exit 1
+	xprop -id "$xid" -f "$prop" 8s -set "$prop" "$uri"
+}
+
+main() {
+	local -r cmd="$1"
+	shift
+	$cmd "$@"
+}
+
+main "$@"
