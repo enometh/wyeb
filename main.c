@@ -5017,7 +5017,7 @@ int main(int argc, char **argv)
 		uri = g_strconcat("file://", uri, NULL);
 
 	char *cwd = g_get_current_dir();
-	char *sendstr = g_strdup_printf("m:%ld:%ld:%s%s%s:%s:%s",
+	char *sendstr = g_strdup_printf("m:%zu:%zu:%s%s%s:%s:%s",
 			strlen(cwd), strlen(exarg), cwd, exarg, winid, action, uri ?: "");
 	g_free(cwd);
 
