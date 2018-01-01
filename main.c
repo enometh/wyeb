@@ -1315,6 +1315,27 @@ static void _openuri(Win *win, const char *str, Win *caller)
 		goto out;
 	}
 
+	if (g_str_has_prefix(str, "/")) {
+		uri = g_strconcat("file://", str, NULL);
+		goto out;
+	}
+
+	static regex_t *ipadr = NULL;
+	if (!ipadr) {
+		ipadr= g_new(regex_t, 1);
+		int err = regcomp(ipadr, "^(([01]?[0-9]?[0-9]|2([0-4][0-9]|5[0-5]))\\.){3}([01]?[0-9]?[0-9]|2([0-4][0-9]|5[0-5]))(:[0-9]+)?(/.*)?",
+			REG_EXTENDED | REG_NOSUB);
+		if (err != 0) {
+			fprintf(stderr, "Could not compile regex %s\n", "");
+			exit(1);
+		}
+	}
+	if ((g_ascii_strncasecmp(str, "localhost", 8) == 0) ||
+	    (regexec(ipadr, str, 0, NULL, 0) == 0)) {
+		uri = g_strconcat("http://", str, NULL);
+		goto out;
+	}
+
 	static regex_t *url;
 	if (!url)
 	{
