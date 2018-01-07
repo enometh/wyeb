@@ -96,3 +96,20 @@ processx(GdkXEvent *e, GdkEvent *event, gpointer user_data)
 	}
 	return GDK_FILTER_CONTINUE;
 }
+
+static void
+print_headers(SoupMessageHeaders *headers, FILE *stream, const char *label)
+{
+	SoupMessageHeadersIter iter;
+	char *name, *value;
+	int printed_label = 0;
+	if (!headers) return;
+	soup_message_headers_iter_init (&iter, headers);
+	while (soup_message_headers_iter_next(&iter, (const char **) &name, (const char **) &value) == TRUE) {
+		if (!printed_label) {
+			if (label) fputs(label, stream);
+			printed_label = 1;
+		}
+		fprintf(stream, "%s: %s\n", name, value);
+	}
+}
