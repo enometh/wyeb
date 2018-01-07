@@ -1840,6 +1840,9 @@ out:
 
 	if (!ret && head)
 	{
+		soup_message_headers_remove(head, "Upgrade-Insecure-Requests");
+		soup_message_headers_remove(head, "Referer");
+
 		if (page->pagereq == 1 && (page->setagent || page->setagentprev))
 			soup_message_headers_replace(head, "User-Agent",
 					getset(page, "user-agent") ?: "");
