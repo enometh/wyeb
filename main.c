@@ -496,6 +496,7 @@ static gboolean clearmsgcb(Win *win)
 static void _showmsg(Win *win, char *msg)
 {
 	if (win->msgfunc) g_source_remove(win->msgfunc);
+	fprintf(stderr, "_SHOWMSG: %s\n", msg);
 	GFA(win->msg, msg)
 	win->msgfunc = !msg ? 0 :
 		g_timeout_add(getsetint(win, "msgmsec"), (GSourceFunc)clearmsgcb, win);
