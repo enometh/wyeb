@@ -2109,6 +2109,88 @@ static void textlinktry(Win *win)
 	send(win, Ctlget, tlpath);
 }
 
+const char *cookiepolicystring(WebKitCookieAcceptPolicy pol)
+{
+	switch(pol) {
+	case WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS: return "ALWAYS";
+	case WEBKIT_COOKIE_POLICY_ACCEPT_NEVER: return "NEVER";
+	case WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY:
+		return "NO_THIRD_PARTY";
+	default: return "UNKNOWN";
+	}
+}
+
+enum cookie_policy_action {
+	COOKIES_ON, COOKIES_OFF, COOKIES_STATUS, COOKIES_CYCLE
+};
+
+struct cookie_policy_action_data {
+	Win *win;
+	enum cookie_policy_action action;
+};
+
+void
+togglecookiepolicycb(GObject *mgr, GAsyncResult *res, gpointer _data)
+{
+	int no_set = 0;
+	struct cookie_policy_action_data * data = (struct cookie_policy_action_data *) _data;
+	enum cookie_policy_action action = data->action;
+	Win *win = data->win;
+	WebKitCookieAcceptPolicy new, current =
+		webkit_cookie_manager_get_accept_policy_finish(WEBKIT_COOKIE_MANAGER(mgr), res, NULL);
+	switch(action) {
+	case COOKIES_STATUS:
+		no_set = 1;
+		break;
+	case COOKIES_ON:
+		new = WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS;
+		no_set = (current == WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS);
+		break;
+	case COOKIES_OFF:
+		new = WEBKIT_COOKIE_POLICY_ACCEPT_NEVER;
+		no_set = (current == WEBKIT_COOKIE_POLICY_ACCEPT_NEVER);
+		break;
+	case COOKIES_CYCLE:
+		switch(current) {
+		// TODO: must clear out cookie from being sent
+		case WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS: /* 0 */
+			new = WEBKIT_COOKIE_POLICY_ACCEPT_NEVER;
+			break;
+		case WEBKIT_COOKIE_POLICY_ACCEPT_NEVER: /* 1 */
+			new = WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY;
+			break;
+		case WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY: /* 2 */
+			new = WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS;
+			break;
+		default:
+			new = WEBKIT_COOKIE_POLICY_ACCEPT_NEVER;
+			fprintf(stderr,
+				"unknown current cookie accept policy %d\n",
+				current);
+		}
+		break;
+	default:
+		fprintf(stderr, "ignoring unknown cookies action %d\n",
+			action);
+		return;
+	}
+	char buf[128];
+	if (action == COOKIES_STATUS)
+		snprintf(buf, sizeof(buf), "Cookie policy set to %s",
+			 cookiepolicystring(current));
+	else if (no_set)
+		snprintf(buf, sizeof(buf), "Cookie policy set to %s (Unchanged)",
+			 cookiepolicystring(current));
+	else
+		snprintf(buf, sizeof(buf), "Cookie policy changed from  %s to %s",
+			 cookiepolicystring(current),
+			 cookiepolicystring(new));
+	showmsg((Win *)win, buf);
+	fprintf(stderr, "%s\n", buf);
+	if (!no_set)
+		webkit_cookie_manager_set_accept_policy(WEBKIT_COOKIE_MANAGER(mgr), new);
+}
+
 
 //@actions
 typedef struct {
@@ -2192,6 +2274,8 @@ static Keybind dkeys[]= {
 	{"editurinew"    , 'W', 0},
 
 	{"inspector"	 , 'O', GDK_CONTROL_MASK},
+	{"cookiepolicy"  , 'V', GDK_CONTROL_MASK},
+
 	{"surfgo"	 , 'g', GDK_CONTROL_MASK},
 	{"surffind"	 , '/', GDK_CONTROL_MASK},
 
@@ -2430,6 +2514,24 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 				webkit_web_context_get_cookie_manager(ctx);
 			webkit_cookie_manager_get_cookies(cm, arg, NULL, cookiescb
 				, spawnp(win, action, exarg, cdir, true)))
+
+		Z("cookiepolicy",
+			static struct cookie_policy_action_data cbdata;
+			cbdata.win = win;
+			if (strcmp(arg, "on") == 0) {
+				cbdata.action = COOKIES_ON;
+			} else if (strcmp(arg, "off") == 0) {
+				cbdata.action = COOKIES_OFF;
+			} else if (strcmp(arg, "status") == 0) {
+				cbdata.action = COOKIES_STATUS;
+			} else if (strcmp(arg, "cycle") == 0) {
+				cbdata.action = COOKIES_CYCLE;
+			} else {
+				fprintf(stderr, "Unknown arg %s\n", arg);
+				cbdata.action = COOKIES_STATUS;
+			}
+			WebKitCookieManager *mgr = webkit_web_context_get_cookie_manager(webkit_web_view_get_context(win->kit));
+			webkit_cookie_manager_get_accept_policy(mgr, NULL, togglecookiepolicycb, &cbdata))
 	}
 
 	Z("tonormal"    , win->mode = Mnormal)
@@ -2653,6 +2755,13 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	xwinid = win->sxid;
 	Z("surffind", SETPROP("_SURF_FIND", "find", "Find:"))
 	Z("surfgo", SETPROP("_SURF_URI", "open", "Go:"))
+
+	Z("cookiepolicy",
+	  WebKitCookieManager *mgr = webkit_web_context_get_cookie_manager(webkit_web_view_get_context(win->kit));
+	  static struct cookie_policy_action_data cbdata;
+	  cbdata.win = win;
+	  cbdata.action = COOKIES_CYCLE;
+	  webkit_cookie_manager_get_accept_policy(mgr, NULL, togglecookiepolicycb, &cbdata))
 
 	Z("textlink", textlinktry(win));
 	Z("raise"   , present(arg ? winbyid(arg) ?: win : win))
