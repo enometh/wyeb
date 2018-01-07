@@ -2228,6 +2228,53 @@ togglecookiepolicycb(GObject *mgr, GAsyncResult *res, gpointer _data)
 		webkit_cookie_manager_set_accept_policy(WEBKIT_COOKIE_MANAGER(mgr), new);
 }
 
+#include <utime.h>
+static void dltimestamp(const char *path, WebKitURIResponse *res, WebKitURIRequest *req)
+{
+	const char *lmtimestamp = NULL;
+	char *header_dump = NULL;
+	if (req || res) {
+		header_dump = g_strconcat(path, ".headers", NULL);
+		FILE *stream = fopen(header_dump, "w");
+		if (stream) {
+		if (req)
+			fprintf(stream, "--> dlfin %s\n\n", webkit_uri_request_get_uri(req));
+		else
+			fprintf(stream, "--> dlfin %s\n\n", webkit_uri_response_get_uri(res));
+		if (req) {
+			print_headers(webkit_uri_request_get_http_headers(req), stream, "---> dlfin request\n\n");
+			fprintf(stream, "\n");
+		}
+		if (res) {
+			print_headers(webkit_uri_response_get_http_headers(res), stream, "---> dlfin response\n\n");
+		}
+		fclose(stream);
+		fprintf(stderr, "dlfin: wrote headers to %s\n", header_dump);
+		} else {
+		  int saved_errno = errno;
+		  fprintf(stderr, "dltimestamp: failed: %s: %s\n", header_dump, g_strerror(saved_errno));
+		}
+		g_free(header_dump);
+	}
+
+	if (res) {
+		lmtimestamp = soup_message_headers_get_one(webkit_uri_response_get_http_headers(res), "Last-Modified");
+	}
+	if (lmtimestamp) {
+		fprintf(stderr, "timestamp %s to %s\n", path, lmtimestamp);
+		SoupDate *soupdate = soup_date_new_from_string(lmtimestamp);
+		if (soupdate) {
+			time_t t = soup_date_to_time_t(soupdate);
+			const struct utimbuf buf = { t , t };
+			struct stat info;
+			stat(path, &info);
+			if (t < info.st_mtime)
+				g_utime(path, &buf);
+			soup_date_free(soupdate);
+		}
+	}
+}
+
 
 //@actions
 typedef struct {
@@ -2920,6 +2967,7 @@ static gboolean dlclosecb(DLWin *win)
 
 	return false;
 }
+
 static void dlfincb(DLWin *win)
 {
 	if (!isin(dlwins, win) || win->finished) return;
@@ -2949,6 +2997,10 @@ static void dlfincb(DLWin *win)
 		}
 
 		addlabel(win, sfree(g_strdup_printf("=>  %s", nfn)));
+		dltimestamp(nfn,
+			    webkit_download_get_response(win->dl),
+			    webkit_download_get_request(win->dl));
+
 		g_free(fn);
 
 		if (win->closemsec)
