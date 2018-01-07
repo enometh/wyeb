@@ -646,3 +646,17 @@ static void ipcwatch(char *name)
 {
 	_ipcwatch(name, g_main_context_default());
 }
+int
+fprintf_gerror(FILE *stream, GError *gerror, const char *fmt, ...)
+{
+	va_list ap;
+	int n, m = 0;
+	if (gerror)
+		m = fprintf(stream, "GERROR:%s:%d: %s\n",
+			    g_quark_to_string(gerror->domain),
+			    gerror->code, gerror->message);
+	va_start(ap, fmt);
+	n = vfprintf(stream, fmt, ap);
+	va_end(ap);
+	return m+n;
+}
