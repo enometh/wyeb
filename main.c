@@ -2301,6 +2301,101 @@ static void dltimestamp(const char *path, WebKitURIResponse *res, WebKitURIReque
 	}
 }
 
+// Return a string denoting the uri to a destination file to which the
+// contents of the given URI should be saved.  This string must be
+// freed by the caller.  If the URI ends with a slash, append an
+// "index.html" basename.  Create all leading directories.  If the
+// immediate parent directory of the target happens to be a file,
+// rename that file out of the way by appending a ".html" to its name
+// before creating the directory. Return NULL on any failure. Does not
+// check if the destination file exists.
+char *
+make_savepath(const char *uri, const char *basedir)
+{
+	SoupURI *souprequri = soup_uri_new(uri);
+	if (!souprequri) {
+		fprintf(stderr, "make_savepath: bad uri: %s\n", uri);
+		return NULL;
+	}
+	if (strcmp(soup_uri_get_scheme(souprequri), "file") == 0) {
+		fprintf(stderr, "make_savepath: refusing to make a path for a file url %s\n", uri);
+		//soup_uri_free(souprequri);
+		return NULL;
+	}
+
+	const char *requripath = soup_uri_get_path(souprequri);
+	const char *requrihost = soup_uri_get_host(souprequri);
+	char *requriquery = (char *)soup_uri_get_query(souprequri);
+	char *requrifragment = (char *)soup_uri_get_fragment(souprequri);
+	if (requriquery) requriquery = g_strconcat("?", requriquery, NULL);
+	if (requrifragment) requrifragment = g_strconcat("#", requrifragment, NULL);
+	char *subpath = g_strconcat(requripath ?: "",
+				    requriquery ?: "",
+				    requrifragment ?: "",
+				    NULL);
+
+	char *path = g_build_filename(basedir ?: "",
+				      requrihost ?: "",
+				      subpath ?: "",
+				      NULL);
+	g_free(subpath);
+	g_free(requriquery);
+	g_free(requrifragment);
+	if (!path) {
+		fprintf(stderr, "make_savepath: %s: failed\n", uri);
+		//soup_uri_free(souprequri);
+		return NULL;
+	}
+	if (g_str_has_suffix(path, "/")) {
+		char *tmp = g_build_filename(path, "index.html", NULL);
+		GFA(path, tmp);
+	}
+
+	gboolean failed = false;
+	char *dir = g_path_get_dirname(path);
+	if (!g_file_test(dir, G_FILE_TEST_EXISTS)) {
+		fprintf(stderr, "make_savepath: MKDIR %s\n", dir);
+		int ret = g_mkdir_with_parents(dir, 0755);
+		if (ret < 0) {
+			fprintf(stderr, "make_save_path: failed to create directory");
+			perror("");
+			failed=true;
+		}
+	}
+	if (!g_file_test(dir, G_FILE_TEST_IS_DIR)) {
+//		fprintf(stderr, "make_savepath: not a directory: %s\n", dir);
+		char *new_file = g_strconcat(dir, ".html", NULL);
+		if (!g_file_test(new_file, G_FILE_TEST_EXISTS)) {
+			fprintf(stderr, "make_save_path: attempting to rename file %s to %s\n", dir, new_file);
+			int ret = rename(dir, new_file);
+			if (ret < 0) {
+				fprintf(stderr, "make_savepath: RENAME failed");
+				perror("");
+				failed=true;
+			} else {
+				fprintf(stderr, "make_savepath: MKDIR %s\n", dir);
+				if (mkdir(dir, 0755) < 0) {
+					fprintf(stderr, "make_savepath: MKDIR failed to create directory: %s\n", dir);
+					perror("");
+					failed=true;
+				}
+			}
+		} else {
+			fprintf(stderr, "make_savepath: fallback rename target %s exists\n", new_file);
+			failed=true;
+		}
+		g_free(new_file);
+	}
+	//soup_uri_free(souprequri);
+	g_free(dir);
+	if (failed) {
+		g_free(path);
+		path = NULL;
+	}
+	fprintf(stderr, "make_savepath(%s): => returning %s\n", uri, path);
+	return path;
+}
+
 
 //@actions
 typedef struct {
@@ -3065,6 +3160,45 @@ static void dldatacb(DLWin *win)
 	setdltitle(win, g_strdup_printf("%.2f%%: %s ", (p * 100), win->dispname));
 }
 //static void dlrescb(DLWin *win) {}
+
+// set an absolute filename
+static void dlrescb(DLWin *win)
+{
+	WebKitURIRequest *req = webkit_download_get_request(win->dl);
+	const char *requri = webkit_uri_request_get_uri(req);
+	const char *base = win->dldir ?: dldir(NULL);
+	char *dest = make_savepath(requri, base);
+	if (!dest) {
+		char *title = "Failed to make destination";
+		addlabel(win, "Failed to make destination");
+		gtk_window_set_title(win->win,title);
+		webkit_download_cancel(win->dl);
+		return;
+	}
+	if (g_file_test(dest, G_FILE_TEST_EXISTS)) {
+		addlabel(win, "fail! file already exists");
+		addlabel(win, "Refusing to overwrite");
+		char *title = "Refusing to overwrite";
+		gtk_window_set_title(win->win,title);
+		webkit_download_cancel(win->dl);
+		g_free(dest);
+		return;
+	}
+	GError *gerror = NULL;
+	char *uri = g_filename_to_uri(dest, NULL, &gerror);
+	if (!uri) {
+		fprintf_gerror(stderr, gerror, "dlrescb: g_filename_to_uri failed: path:%s basedir:%s\n", dest, base);
+		char *title="Failed to make destination uri";
+		addlabel(win, "failed to make uri destination uri");
+		gtk_window_set_title(win->win,title);
+		webkit_download_cancel(win->dl);
+		g_free(dest);
+		return;
+	}
+	webkit_download_set_destination(win->dl, uri);
+	g_free(dest);
+}
+
 static void dldestcb(DLWin *win)
 {
 
@@ -3078,6 +3212,7 @@ static void dldestcb(DLWin *win)
 }
 static gboolean dldecidecb(WebKitDownload *pdl, char *name, DLWin *win)
 {
+	goto skip_set_destination;
 	char *path = g_build_filename(win->dldir, name, NULL);
 
 	if (strcmp(win->dldir, sfree(g_path_get_dirname(path))))
@@ -3100,6 +3235,7 @@ static gboolean dldecidecb(WebKitDownload *pdl, char *name, DLWin *win)
 
 	g_free(path);
 
+skip_set_destination:
 
 	//set view data
 	win->res = true;
@@ -3156,7 +3292,7 @@ static void downloadcb(WebKitWebContext *ctx, WebKitDownload *pdl)
 	GObject *o = (GObject *)win->dl;
 	SIG( o, "decide-destination" , dldecidecb, win);
 	SIGW(o, "created-destination", dldestcb  , win);
-//	SIGW(o, "notify::response"   , dlrescb   , win);
+	SIGW(o, "notify::response"   , dlrescb   , win);
 	SIG( o, "failed"             , dlfailcb  , win);
 	SIGW(o, "finished"           , dlfincb   , win);
 	SIGW(o, "received-data"      , dldatacb  , win);
