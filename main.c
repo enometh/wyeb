@@ -5107,7 +5107,7 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 					WEBKIT_COOKIE_PERSISTENT_STORAGE_TEXT);
 
 		webkit_cookie_manager_set_accept_policy(cookiemgr,
-				WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY);
+				WEBKIT_COOKIE_POLICY_ACCEPT_NEVER);
 
 		if (g_key_file_get_boolean(conf, "boot", "multiwebprocs", NULL))
 			webkit_web_context_set_process_model(ctx,
