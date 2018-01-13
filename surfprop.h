@@ -4,6 +4,7 @@
 static Atom atomGo =  0;
 static Atom atomFind =  0;
 static Atom atomUri = 0;
+static Atom atomCharset = 0;
 
 static void
 setatom(Win *win, int a, const char *v)
@@ -20,9 +21,11 @@ initatoms(Win *win)
 	if (!atomGo) atomGo = XInternAtom(win->dpy, "_SURF_GO", False);
 	if (!atomFind) atomFind = XInternAtom(win->dpy, "_SURF_FIND", False);
 	if (!atomUri) atomUri = XInternAtom(win->dpy, "_SURF_URI", False);
+	if (!atomCharset) atomCharset = XInternAtom(win->dpy, "_SURF_CHARSET", False);
 	setatom(win, atomGo, "");
 	setatom(win, atomFind, "");
 	setatom(win, atomUri, "about:blank");
+	setatom(win, atomCharset, "");
 }
 
 static const char *
@@ -89,6 +92,13 @@ processx(GdkXEvent *e, GdkEvent *event, gpointer user_data)
 				const char * s = getatom(win, atomGo);
 				if (s && *s) {
 					run(win, "open", s);
+					return GDK_FILTER_REMOVE;
+				}
+			}
+			if (ev->atom == atomCharset) {
+				const char * s = getatom(win, atomCharset);
+				if (s && *s) {
+					run(win, "customcharset", s);
 					return GDK_FILTER_REMOVE;
 				}
 			}
