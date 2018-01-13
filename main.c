@@ -44,6 +44,20 @@ typedef enum {
 	Mpointer   = 8192,
 } Modes;
 
+typedef enum {
+	VSH_HTML,
+	VSH_SOURCE,
+	VSH_HEADERS
+} viewsourceorheaders_mode;
+
+typedef struct {
+	char * uri;
+	char *mimetype;
+	viewsourceorheaders_mode mode;
+	GBytes *source;
+	GBytes *headers;
+} viewsourceorheader_info;
+
 typedef struct _Spawn Spawn;
 
 typedef struct _WP {
@@ -150,6 +164,8 @@ typedef struct _WP {
 	Window xid;
 	char sxid[64];
 	Display *dpy;
+
+	viewsourceorheader_info v;
 } Win;
 
 struct _Spawn {
@@ -2411,6 +2427,124 @@ savesourcecb(GObject *res, GAsyncResult *result, gpointer user_data)
 	g_free(dest);
 }
 
+void vsh_clear(Win *win)
+{
+	g_free(win->v.uri); win->v.uri = NULL;
+	g_free(win->v.mimetype); win->v.mimetype = NULL;
+	if (win->v.source) g_bytes_unref(win->v.source);
+	win->v.source = NULL;
+	if (win->v.headers) g_bytes_unref(win->v.headers);
+	win->v.headers = NULL;
+}
+
+void
+viewsourceorheaderscb(GObject *res, GAsyncResult *result, gpointer dest)
+{
+	Win *win = (Win *)dest;
+	fprintf(stderr, "viewsourceorheaderscb(%d)\n", win->v.mode);
+	gsize len; GError *gerror = NULL;
+	guchar *data = webkit_web_resource_get_data_finish(
+		(WebKitWebResource *)res, result, &len, &gerror);
+	if (!data)
+		fprintf_gerror(stderr, gerror, "viewsourceorheaderscb: no data to save to %s\n", dest);
+	else {
+		g_assert(!win->v.source);
+		g_assert(!win->v.headers);
+		g_assert(!win->v.mimetype);
+		g_assert(!win->v.uri);
+		win->v.uri = strdup(webkit_web_resource_get_uri((WebKitWebResource *)res));
+		// we expect the uri in the WebKitWebView to be the
+		// same as the uri in the WebKitWebResource. But if
+		// load fails, the web resource only has
+		// "about:blank". This happens for example with 999
+		// HTTP responses from linkedin which result in a
+		// "Message Corrupt" from libsoup.
+		if (! (strcmp(win->v.uri, URI(win)) == 0))
+			fprintf(stderr, "viewsourceorheaderscb: TODO apparently load failed\n");
+		fprintf(stderr, "viewresourceorheaderscb: filling data for uri %s\n", win->v.uri);
+		WebKitURIResponse *response = webkit_web_resource_get_response((WebKitWebResource *)res);
+		win->v.mimetype = response ? g_strdup((char *) webkit_uri_response_get_mime_type(response)) : NULL; // defaults to text/html
+		win->v.source = g_bytes_new_take(data, len);
+		if (response) {
+			SoupMessageHeaders *head = webkit_uri_response_get_http_headers(response);
+			if (head) {
+				char *str = NULL, *name, *value;
+				SoupMessageHeadersIter iter;
+				soup_message_headers_iter_init (&iter, head);
+				while (soup_message_headers_iter_next(&iter, (const char **) &name, (const char **) &value) == TRUE) {
+					char *tmp = g_strdup_printf("%s%s: %s\n", str ?: "", name, value);
+					g_free(str);
+					str = tmp;
+				}
+				if (str)
+					win->v.headers = g_bytes_new_take(str, strlen(str));
+				else fprintf(stderr, "viewsourceorheaderscb: no headers in SoupMessageHeaders\n");
+			} else fprintf(stderr, "viewsourceorheaderscb: no SoupMessageHeaders\n");
+		}
+		switch(win->v.mode) {
+		case VSH_SOURCE:
+			webkit_web_view_load_bytes(win->kit, win->v.source, "text/plain", "ISO-8895-1", URI(win));
+			break;
+		case VSH_HEADERS:
+			if (win->v.headers)
+				webkit_web_view_load_bytes(win->kit, win->v.headers, "text/plain", "ISO-8895-1", URI(win));
+			else
+				fprintf(stderr, "viewsourceorheaderscb: load headers failed\n");
+			break;
+		case VSH_HTML:
+		default:
+			fprintf(stderr, "viewsourceorheaderscb: unexpected mode: %d\n", win->v.mode);
+			webkit_web_view_load_bytes(win->kit, win->v.source, win->v.mimetype, NULL, URI(win));
+		}
+	}
+}
+
+static void viewsourceorheaders(Win *win, viewsourceorheaders_mode flag)
+{
+	if (win->v.uri) {
+		if (strcmp(URI(win), win->v.uri) == 0) {
+			fprintf(stderr, "viewresourceorheaders: %d: orig=%d: same uri %s\n", flag, win->v.mode, win->v.uri);
+			if (flag == win->v.mode) {
+				// revert back to html
+				if (win->v.mode != VSH_HTML) {
+					fprintf(stderr, "revert to html\n");
+					win->v.mode = VSH_HTML;
+					webkit_web_view_load_bytes(win->kit, win->v.source, win->v.mimetype, NULL, URI(win));
+				} else
+					fprintf(stderr, "no change\n");
+			} else if (flag == VSH_SOURCE) {
+				fprintf(stderr, "view source\n");
+				win->v.mode = VSH_SOURCE;
+				webkit_web_view_load_bytes(win->kit, win->v.source, "text/plain", "ISO-8895-1", URI(win));
+			} else if (flag == VSH_HTML) {
+				fprintf(stderr, "view html\n");
+				win->v.mode = VSH_HTML;
+				webkit_web_view_load_bytes(win->kit, win->v.source, win->v.mimetype, NULL, URI(win));
+			} else {
+				fprintf(stderr, "view headers\n");
+				g_assert(flag == VSH_HEADERS);
+				int orig = win->v.mode;
+				win->v.mode = VSH_HEADERS;
+				if (win->v.headers)
+					webkit_web_view_load_bytes(win->kit, win->v.headers, "text/plain", "ISO-8895-1", URI(win));
+				else {
+					win->v.mode = orig;
+					fprintf(stderr, "viewresourceorheaders: no headers on back button: reset mode to: %d\n", orig);
+				}
+			}
+			return;
+		}
+		fprintf(stderr, "viewresourceorheaders: freeing data for old uri %s\n", win->v.uri);
+		vsh_clear(win);
+	}
+	WebKitWebResource *res = webkit_web_view_get_main_resource(win->kit);
+	win->v.mode = flag;
+	if (res)
+		webkit_web_resource_get_data(res, NULL, viewsourceorheaderscb, win);
+	else
+		fprintf(stderr, "viewsourceorheaders: no resource\n");
+}
+
 
 //@actions
 typedef struct {
@@ -2500,6 +2634,8 @@ static Keybind dkeys[]= {
 	{"surffind"	 , '/', GDK_CONTROL_MASK},
 	{"savemhtml"	 , 'S', GDK_CONTROL_MASK},
 	{"savesource"	 , 'd', GDK_CONTROL_MASK},
+	{"viewsource"	 , '\\', 0},
+	{"viewheaders"	 , '=', GDK_CONTROL_MASK},
 
 //	{"showsource"    , 'S', 0}, //not good
 	{"showhelp"      , ':', 0},
@@ -2876,7 +3012,8 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	 )
 	Z("stop"        , webkit_web_view_stop_loading(win->kit))
 	Z("reload"      , webkit_web_view_reload(win->kit))
-	Z("reloadbypass", webkit_web_view_reload_bypass_cache(win->kit))
+	Z("reloadbypass", vsh_clear(win);
+			webkit_web_view_reload_bypass_cache(win->kit))
 
 	Z("find"        , win->mode = Mfind)
 	Z("findnext"    , findnext(win, true))
@@ -3013,6 +3150,9 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			  webkit_web_view_save_to_file
 				  (win->kit, gfile, WEBKIT_SAVE_MODE_MHTML,
 				   NULL, savemhtmlcb, gfile); }})
+
+	Z("viewsource", viewsourceorheaders(win, VSH_SOURCE))
+	Z("viewheaders", viewsourceorheaders(win, VSH_HEADERS))
 
 	Z("textlink", textlinktry(win));
 	Z("raise"   , present(arg ? winbyid(arg) ?: win : win))
@@ -3881,6 +4021,11 @@ static void destroycb(Win *win)
 
 	//spawn
 	spawnfree(win->spawn, true);
+
+	g_free(win->v.uri);
+	g_free(win->v.mimetype);
+	g_bytes_unref(win->v.source);
+	g_bytes_unref(win->v.headers);
 
 	g_free(win);
 }
