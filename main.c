@@ -2396,6 +2396,47 @@ make_savepath(const char *uri, const char *basedir)
 	return path;
 }
 
+void
+savemhtmlcb(GObject *res, GAsyncResult *result, gpointer user_data)
+{
+	GError *gerror = NULL;
+	WebKitWebView *web_view = (WebKitWebView *)res;
+	GFile *gfile = (GFile *) user_data;
+	gboolean ret = webkit_web_view_save_to_file_finish(web_view, result, &gerror);
+	char *dest = g_file_get_path(gfile);
+	if (ret)
+		fprintf(stderr, "savemhtmlcb: saved mhtml to %s\n", dest);
+	else
+		fprintf_gerror(stderr, gerror, "savemhtmlcb: could not save mhtml to %s\n", dest);
+	g_free(dest);
+	g_object_unref(gfile);
+}
+
+void
+savesourcecb(GObject *res, GAsyncResult *result, gpointer user_data)
+{
+	char *dest = (char *)user_data;
+	gsize len; GError *gerror = NULL;
+	guchar *data = webkit_web_resource_get_data_finish(
+		(WebKitWebResource *)res, result, &len, &gerror);
+	if (!data)
+		fprintf_gerror(stderr, gerror, "savesourcecb: no data to save to %s\n", dest);
+	else {
+		GFile *gfile = g_file_new_for_path(dest);
+		gerror = NULL;
+		gboolean ret = g_file_replace_contents
+			(gfile, (char *)data, len, NULL, false, //XXX
+			 G_FILE_CREATE_NONE, NULL, NULL, &gerror);
+		if (!ret)
+			fprintf_gerror(stderr, gerror, "savesourcecb: error saving: %s\n", dest);
+		else
+			fprintf(stderr, "savesourcecb: saved %s\n", dest);
+		g_object_unref(gfile);
+		dltimestamp(dest, webkit_web_resource_get_response((WebKitWebResource *)res), NULL);
+	}
+	g_free(dest);
+}
+
 
 //@actions
 typedef struct {
@@ -2483,6 +2524,8 @@ static Keybind dkeys[]= {
 
 	{"surfgo"	 , 'g', GDK_CONTROL_MASK},
 	{"surffind"	 , '/', GDK_CONTROL_MASK},
+	{"savemhtml"	 , 'S', GDK_CONTROL_MASK},
+	{"savesource"	 , 'd', GDK_CONTROL_MASK},
 
 //	{"showsource"    , 'S', 0}, //not good
 	{"showhelp"      , ':', 0},
@@ -2976,6 +3019,36 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	  cbdata.win = win;
 	  cbdata.action = COOKIES_CYCLE;
 	  webkit_cookie_manager_get_accept_policy(mgr, NULL, togglecookiepolicycb, &cbdata))
+
+	Z("savesource",
+	  WebKitWebResource *res = webkit_web_view_get_main_resource(win->kit);
+	  if (res) {
+		  WebKitURIResponse *resp = webkit_web_resource_get_response(res);
+		  char *dest = resp ? make_savepath(webkit_uri_response_get_uri(resp), dldir(NULL)) : NULL;
+		  if (!dest) fprintf(stderr, "savesource: no target path\n");
+		  else if (g_file_test(dest, G_FILE_TEST_EXISTS)) {
+			  fprintf(stderr, "savesource: not overwriting %s\n", dest);
+			  g_free(dest);
+		  } else webkit_web_resource_get_data(res, NULL, savesourcecb, dest);
+	  } else fprintf(stderr, "savesource: no main resource to save\n");
+		)
+
+	Z("savemhtml",
+	  char *dest = make_savepath(URI(win), dldir(NULL));
+	  if (!dest)
+		  fprintf(stderr, "savemhtml: no target path\n");
+	  else {
+		  char *tmp = g_strdup_printf("%s.mhtml", dest);
+		  g_free(dest);
+		  if (g_file_test(tmp, G_FILE_TEST_EXISTS)) {
+			  fprintf(stderr, "savemhtml: not overwriting %s\n", tmp);
+			  g_free(tmp);
+		  } else {
+			  GFile *gfile = g_file_new_for_path(tmp);
+			  g_free(tmp);
+			  webkit_web_view_save_to_file
+				  (win->kit, gfile, WEBKIT_SAVE_MODE_MHTML,
+				   NULL, savemhtmlcb, gfile); }})
 
 	Z("textlink", textlinktry(win));
 	Z("raise"   , present(arg ? winbyid(arg) ?: win : win))
