@@ -2697,6 +2697,7 @@ static Keybind dkeys[]= {
 			"\n  Make sure, the callbacks of "APP" are async."
 			"\n  The stdout is not caller's but first process's stdout."},
 #endif
+	{"surfcharset"	 , 0, 0, "Reload with charset"},
 
 //todo pagelist
 //	{"windowimage"   , 0, 0}, //pageid
@@ -2890,6 +2891,8 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			}
 			WebKitCookieManager *mgr = webkit_web_context_get_cookie_manager(webkit_web_view_get_context(win->kit));
 			webkit_cookie_manager_get_accept_policy(mgr, NULL, togglecookiepolicycb, &cbdata))
+		Z("customcharset", webkit_web_view_set_custom_charset(
+			win->kit, (strcmp(arg, "") == 0) ? NULL : arg))
 	}
 
 	Z("tonormal"    , win->mode = Mnormal)
@@ -3113,6 +3116,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	xwinid = win->sxid;
 	Z("surffind", SETPROP("_SURF_FIND", "find", "Find:"))
 	Z("surfgo", SETPROP("_SURF_URI", "open", "Go:"))
+	Z("surfcharset", SETPROP("_SURF_CHARSET", "customcharset", "Charset:"))
 
 	Z("cookiepolicy",
 	  WebKitCookieManager *mgr = webkit_web_context_get_cookie_manager(webkit_web_view_get_context(win->kit));
