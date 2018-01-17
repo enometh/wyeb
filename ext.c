@@ -35,6 +35,10 @@ along with wyeb.  If not, see <http://www.gnu.org/licenses/>.
 #include <ctype.h>
 #include <webkit2/webkit-web-extension.h>
 
+typedef enum {
+	W3MMODE_USECONF, W3MMODE_OFF, W3MMODE_ONE, W3MMODE_SAME_HOST
+} w3mmode_status_enum;
+
 typedef struct _WP {
 	WebKitWebPage *kit;
 #if JSC
@@ -62,6 +66,10 @@ typedef struct _WP {
 	char          *overset;
 	bool           setagent;
 	bool           setagentprev;
+
+	//overrides conf value for w3mmode setting if set to something
+	//other than W3MMODE_USECONF
+	w3mmode_status_enum w3mmode_status;
 } Page;
 
 #include "general.c"
@@ -1637,6 +1645,31 @@ static void halfscroll(Page *page, bool d)
 	g_object_unref(win);
 }
 
+static gboolean offline = false;
+
+static void w3mmode_setstatus(Page *page, const char *arg, int resetp)
+{
+	w3mmode_status_enum old = page->w3mmode_status;
+	if (strcmp(arg, "one") == 0)
+		page->w3mmode_status = W3MMODE_ONE;
+	else if (strcmp(arg, "same_host") == 0)
+		page->w3mmode_status = W3MMODE_SAME_HOST;
+	else if (strcmp(arg, "off") == 0)
+		page->w3mmode_status = W3MMODE_OFF;
+	else if (strcmp(arg, "use_conf") == 0)
+		page->w3mmode_status = W3MMODE_USECONF;
+	else if (strcmp(arg, "status") == 0) {// noop
+	} else {
+		g_print("ext: invalid value for w3mmode_setstatus: %s. reset to W3MMODE_ONE\n", arg);
+		page->w3mmode_status = W3MMODE_ONE;
+	}
+	char *useconf = NULL;
+	if (!resetp || (page->w3mmode_status != old))
+		send(page, "w3mmode_status", page->w3mmode_status == W3MMODE_ONE ? "ONE" : (page->w3mmode_status == W3MMODE_SAME_HOST) ? "SAME_HOST" : (page->w3mmode_status == W3MMODE_OFF) ? "OFF" : (page->w3mmode_status == W3MMODE_USECONF) ? (useconf = g_strdup_printf("USECONF: %s", getset(page,"w3mmode"))) : "INVALID!");
+	if(useconf) g_free(useconf);
+}
+
+
 //@ipccb
 static gboolean msgcb(WebKitWebPage *kp, WebKitUserMessage *msg, Page *page)
 {
@@ -1751,6 +1784,18 @@ static gboolean msgcb(WebKitWebPage *kp, WebKitUserMessage *msg, Page *page)
 	case Cscroll:
 		halfscroll(page, *arg == 'd');
 		break;
+
+	case Cw3mmode:
+		w3mmode_setstatus(page, arg, 0);
+		break;
+
+	case Coffline:
+		if (strcmp(arg, "true") == 0)
+			offline = true;
+		else if (strcmp(arg, "false") == 0)
+			offline = false;
+		send(page, "offline_status", offline ? "true" : "false");
+		break;
 	}
 
 	g_strfreev(args);
@@ -1763,32 +1808,152 @@ static void headerout(const char *name, const char *value, gpointer p)
 {
 	g_print("%s : %s\n", name, value);
 }
+
+
+int
+uri_scheme_http_p(const char *uri)
+{
+  int i; const char *p;
+  for (i = 0, p = uri; *p; p++, i++)
+    switch(i) {
+    case 0: if (*p != 'h') return 0; break;
+    case 1: if (*p != 't') return 0; break;
+    case 2: if (*p != 't') return 0; break;
+    case 3: if (*p != 'p') return 0; break;
+    case 4: if (*p != 's') return 0; break;
+    default: return 0;
+    }
+  return 1;
+}
+
+#if SOUP_MAJOR_VERSION == 2
+#undef SOUP_URI_VALID_FOR_HTTP
+#endif
+#define SOUP_URI_VALID_FOR_HTTP(uri) ((uri) && uri_scheme_http_p(g_uri_get_scheme(uri)) && g_uri_get_host(uri) && g_uri_get_path(uri))
+
 static gboolean reqcb(
 		WebKitWebPage *p,
 		WebKitURIRequest *req,
 		WebKitURIResponse *res,
 		Page *page)
 {
+	bool ret = false;
+	char *reason="";
+
 	page->pagereq++;
 	const char *reqstr = webkit_uri_request_get_uri(req);
 	D(reqcb %s, reqstr)
+
+	if (offline) return true;
+
 	if (g_str_has_prefix(reqstr, APP":"))
+	{
+		fprintf(stderr, "REQCB: ACCEPT: %s: scheme\n", reqstr);
 		return false;
+	}
 
 	const char *pagestr = webkit_web_page_get_uri(page->kit);
 	SoupMessageHeaders *head = webkit_uri_request_get_http_headers(req);
 
+	// special case data to avoid long data urls in output
+	if (!head && g_str_has_prefix(reqstr, "data:")) {
+		static char buf[126]; int i;
+		for (i = 0; i < (sizeof(buf) - 3) && reqstr[i]; i++)
+			buf[i] = reqstr[i];
+		if (i == (sizeof(buf) - 3)) {
+			buf[i++] = '.';
+			buf[i++] = '.';
+			buf[i++] = '\0';
+		}
+		fprintf(stderr, "REQCB: ACCEPT: %s: scheme\n", buf);
+		return false;
+	}
 
-	bool ret = false;
+	GUri *puri = NULL;
+	GUri *ruri = NULL;
+
+	// the ui process sets page->w3mmode_status. If it is set by
+	// the ui process, use it. Otherwise use what is set by the
+	// conf system
+	w3mmode_status_enum w3mmode_status = page->w3mmode_status;
+	g_assert(w3mmode_status == W3MMODE_ONE ||
+		 w3mmode_status == W3MMODE_SAME_HOST ||
+		 w3mmode_status == W3MMODE_OFF ||
+		 w3mmode_status == W3MMODE_USECONF);
+	if (w3mmode_status == W3MMODE_USECONF) {
+		char *w3mmode =  getset(page, "w3mmode");
+		if (w3mmode) {
+			if (strcmp(w3mmode, "one") == 0)
+				w3mmode_status = W3MMODE_ONE;
+			else if (strcmp(w3mmode, "same_host") == 0)
+				w3mmode_status = W3MMODE_SAME_HOST;
+			else if (strcmp(w3mmode, "off") == 0)
+				w3mmode_status = W3MMODE_OFF;
+		}
+		// check if it was set correctly
+		if (w3mmode_status == W3MMODE_USECONF) {
+			fprintf(stderr, "invalid conf setting for w3mmode_status: %s. Using W3MMODE_ONE\n", w3mmode);
+			w3mmode_status = W3MMODE_ONE;
+		}
+	}
+
+	if (w3mmode_status == W3MMODE_ONE)  {
+		const char *respuri = webkit_web_page_get_uri(p);
+		if (reqstr && respuri) {
+			const char *g = reqstr;
+			const char *h = respuri;
+			if ((*g++ == *h && *h++ == 'h') &&
+			    (*g++ == *h && *h++ == 't') &&
+			    (*g++ == *h && *h++ == 't') &&
+			    (*g++ == *h && *h++ == 'p') &&
+			    ((*g && *h && *g == *h) ||
+			     (*g == ':' && *h == 's' && *++h) ||
+			     (*g == 's' && *h == ':' && *++g)) &&
+			    strcmp(g, h) == 0) {
+				//ok
+			} else {
+				int glen = strlen(g);
+				int hlen = strlen(h);
+				if ((glen == hlen + 1 && g[glen - 1] == '/') ||
+				    (hlen == glen + 1 && h[hlen - 1] == '/')) {
+					//ok
+				} else if (hlen == glen && strcmp(g, h) == 0) {
+					//ok
+				} else {
+					reason = "w3mone";
+					ret = true; goto end;
+				}
+			}
+		}
+	} else if (w3mmode_status == W3MMODE_OFF) {
+	} else if (w3mmode_status == W3MMODE_SAME_HOST) {
+		ruri = ruri ?: g_uri_parse(reqstr, SOUP_HTTP_URI_FLAGS, NULL);
+		puri = puri ?: g_uri_parse(pagestr, SOUP_HTTP_URI_FLAGS, NULL);
+		if (SOUP_URI_VALID_FOR_HTTP(ruri)) {
+			if (!SOUP_URI_VALID_FOR_HTTP(puri) ||
+			    strcmp(g_uri_get_host(puri),
+				   g_uri_get_host(ruri))) {
+				g_uri_unref(puri);
+				g_uri_unref(ruri);
+				reason = "w3msamehost";
+				ret = true; goto end;
+			}
+		}
+	}
+
 	int check = checkwb(reqstr);
-	if (check == 0)
+	if (check == 0) {
+		reason = "checkwb";
 		ret = true;
+	}
 	else if (check == -1 && getsetbool(page, "adblock"))
 	{
 		bool (*checkf)(const char *, const char *) =
 			g_object_get_data(G_OBJECT(page->kit), APP"check");
-		if (checkf)
+		if (checkf) {
+			reason = "adblock";
 			ret = !checkf(reqstr, pagestr);
+		}
 	}
 	if (ret) goto out;
 
@@ -1797,6 +1962,7 @@ static gboolean reqcb(
 		//in redirection we don't get yet current uri
 		resetconf(page, reqstr, false);
 		page->pagereq = 1;
+		reason = "pagereqredirect";
 		page->redirected = true;
 		goto out;
 	}
@@ -1806,11 +1972,20 @@ static gboolean reqcb(
 		|| !head
 		|| !getsetbool(page, "reldomaindataonly")
 		|| !soup_message_headers_get_list(head, "Referer")
-	) goto out;
+	) {
+		reason = "check-noreldomain-norefererer";
+		goto out;
+	}
 
 	//reldomainonly
-	GUri *puri = g_uri_parse(pagestr, SOUP_HTTP_URI_FLAGS, NULL);
+	puri = puri ?: g_uri_parse(pagestr, SOUP_HTTP_URI_FLAGS, NULL);
 	const char *phost = g_uri_get_host(puri);
+
+	//g_assert(strcmp(reason,"")==0);
+	if (strcmp(reason,"") != 0) {
+		fprintf(stderr, "---------->ASSERTFAIL: reason=%s\n", reason);
+	}
+
 	if (phost)
 	{
 		char **cuts = g_strsplit(
@@ -1823,13 +1998,13 @@ static gboolean reqcb(
 			}
 		g_strfreev(cuts);
 
-		GUri *ruri = g_uri_parse(reqstr, SOUP_HTTP_URI_FLAGS, NULL);
+		ruri = ruri ?: g_uri_parse(reqstr, SOUP_HTTP_URI_FLAGS, NULL);
 		const char *rhost = g_uri_get_host(ruri);
 
+		reason = "reldomain" ;
 		ret = rhost && !g_str_has_suffix(rhost, phost);
-
-		g_uri_unref(ruri);
 	}
+	g_uri_unref(ruri);
 	g_uri_unref(puri);
 
 out:
@@ -1880,6 +2055,10 @@ out:
 		g_print("\n");
 	}
 
+end:
+	fprintf(stderr, "REQCB %s: %s: %s\n",
+		(ret == true) ? "REJECT" : "ACCEPT",
+		reqstr, reason);
 	return ret;
 }
 //static void formcb(WebKitWebPage *page, GPtrArray *elms, gpointer p) {}
@@ -1914,6 +2093,7 @@ static void initpage(WebKitWebExtension *ex, WebKitWebPage *kp)
 	page->mf = webkit_web_page_get_main_frame(kp);
 #endif
 	page->seto = g_object_new(G_TYPE_OBJECT, NULL);
+	page->w3mmode_status = W3MMODE_USECONF;
 	g_ptr_array_add(pages, page);
 
 	wbpath = path2conf("whiteblack.conf");

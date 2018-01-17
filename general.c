@@ -102,6 +102,9 @@ typedef enum {
 	Ctlget  = 'g',
 	Cwithref= 'W',
 	Cscroll = 'v',
+
+	Cw3mmode= '3',
+	Coffline= 'K',
 } Coms;
 
 
@@ -181,6 +184,7 @@ static Conf dconf[] = {
 	{DSET    , "removeheaders"    , "",
 		"removeheaders=Upgrade-Insecure-Requests;Referer;"},
 	{DSET    , "rmnoscripttag"    , "false"},
+	{DSET    , "w3mmode"          , "one" }, // one, off, same_host
 
 	//bookmark
 	{DSET    , "linkformat"       , "[%.40s ](%s)", "\nbookmark\n"},
@@ -637,4 +641,3 @@ fprintf_gerror(FILE *stream, GError *gerror, const char *fmt, ...)
 	va_end(ap);
 	return m+n;
 }
-
