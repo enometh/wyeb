@@ -2928,6 +2928,14 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			webkit_cookie_manager_get_accept_policy(mgr, NULL, togglecookiepolicycb, &cbdata))
 		Z("customcharset", webkit_web_view_set_custom_charset(
 			win->kit, (strcmp(arg, "") == 0) ? NULL : arg))
+
+		Z("w3mmode_status",
+			_showmsg(win, g_strdup_printf("w3mmode is %s", arg)))
+		Z("offline_status",
+			_showmsg(win, g_strdup_printf("offline status is %s", arg)))
+		Z("w3mmode", send(win, Cw3mmode, (char *)arg))
+		Z("offline", send(win, Coffline, (char *)arg))
+
 	}
 
 	Z("tonormal"    , win->mode = Mnormal)
