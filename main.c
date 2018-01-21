@@ -2597,6 +2597,7 @@ static Keybind dkeys[]= {
 	{"inspector"	 , 'O', GDK_CONTROL_MASK},
 	{"cookiepolicy"  , 'V', GDK_CONTROL_MASK},
 
+	{"surfcmdprompt",  'x', GDK_MOD1_MASK },
 	{"surfgo"	 , 'g', GDK_CONTROL_MASK},
 	{"surffind"	 , '/', GDK_CONTROL_MASK},
 	{"savemhtml"	 , 'S', GDK_CONTROL_MASK},
@@ -3090,6 +3091,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 		)
 
 	xwinid = win->sxid;
+	Z("surfcmdprompt", surf_cmdprompt(win))
 	Z("surffind", SETPROP("_SURF_FIND", "find", "Find:"))
 	Z("surfgo", SETPROP("_SURF_URI", "open", "Go:"))
 	Z("surfcharset", SETPROP("_SURF_CHARSET", "customcharset", "Charset:"))
