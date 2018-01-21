@@ -5285,12 +5285,52 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 		fprintf(stderr,"main newwin: initializing userdata=%s\n", udata);
 		g_free(udata);
 
+		// use env var if it is a directory
+		char* extdir = (char *) g_getenv("WEBKIT_EXT_DIR");
+		if (extdir && !g_file_test(extdir, G_FILE_TEST_IS_DIR)) {
+			fprintf(stderr, "init_web_extensions: bogus WEBKIT_EXT_DIR=%s\n", extdir);
+			extdir = NULL;
+		} else {
+			if (extdir) extdir = strdup(extdir);
+		}
+
+#ifdef DEBUG
+		// or use executable location if extension is present
+		if (!extdir) {
+			char binpath[256];
+			int ret = readlink("/proc/self/exe", binpath, sizeof(binpath)-1);
+			g_assert(ret > 0 && ret < sizeof(binpath) - 1);
+			binpath[ret] = 0;
+			extdir = g_path_get_dirname(binpath);
+			char *test = g_build_filename(extdir, "ext.so", NULL);
+			if (!g_file_test(test, G_FILE_TEST_EXISTS)) {
+				g_free(extdir);
+				extdir = NULL;
+			}
+			g_free(test);
+		}
+#endif
+
+		// or use compiled in defualt if extension is present
+		if (!extdir) {
+			char *test = g_build_filename(EXTENSION_DIR, "ext.so", NULL);
+			if (g_file_test(test, G_FILE_TEST_EXISTS))
+				extdir = strdup(EXTENSION_DIR);
+			g_free(test);
+		}
+
+		if (extdir) {
+			webkit_web_context_set_web_extensions_directory(ctx, extdir);
+			g_free(extdir);
+		} else {
+
 #if DEBUG
 		webkit_web_context_set_web_extensions_directory(ctx,
 				sfree(g_get_current_dir()));
 #else
 		webkit_web_context_set_web_extensions_directory(ctx, EXTENSION_DIR);
 #endif
+		}
 
 		SIG(ctx, "download-started", downloadcb, NULL);
 
