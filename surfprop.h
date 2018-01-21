@@ -1,6 +1,9 @@
 #include <X11/X.h>
 #include <X11/Xatom.h>
 
+#include <sys/types.h>
+#include <sys/wait.h>
+ 
 static Atom atomGo =  0;
 static Atom atomFind =  0;
 static Atom atomUri = 0;
@@ -122,4 +125,134 @@ print_headers(SoupMessageHeaders *headers, FILE *stream, const char *label)
 		}
 		fprintf(stream, "%s: %s\n", name, value);
 	}
+}
+
+
+// ---------------------------------------------------------------------
+//
+//
+//
+
+typedef union {
+	int i;
+	float f;
+	const void *v;
+} Arg;
+
+/* cmdprompt system */
+typedef struct {
+        char *cmdname;
+        void (*func)(Win *w, const Arg *arg);
+        const Arg arg;
+	char *wyebrun;
+} Cmd;
+
+void foo(Win *w, const Arg *a) { fprintf(stderr, "foo: win->sxid=%s\n", w->sxid); }
+
+static Cmd choices[] = {
+	{ "foo",		foo,	{ 0 } },
+};
+
+void surf_cmdprompt(Win *w)
+{
+	char buf[1024];
+	int buflen = sizeof(buf);
+	int pipefd[2], bikefd[2], cpid;
+	int len, maxlen = -1, nread, pos, i;
+	char *s;
+
+	if (pipe(pipefd) == -1 || pipe(bikefd) == -1) {
+		perror("pipe()");
+		return;
+	}
+
+	if ((cpid = fork()) == -1) {
+		perror("fork()");
+		return;
+	}
+
+	if (cpid == 0) { /* child reads from pipe[0] writes to bike[1] */
+		fflush(stderr);
+
+		close(pipefd[1]);
+		close(bikefd[0]);
+
+		if (dup2(pipefd[0], STDIN_FILENO) == -1) {
+			perror("dup2");
+			return;
+		}
+		if (dup2(bikefd[1], STDOUT_FILENO) == -1) {
+			perror("dup2");
+			return;
+		}
+		close(pipefd[0]);
+		close(bikefd[1]);
+
+		xwinid = w->sxid;
+		if (execlp("dmenu", "dmenu", "-l", "10",  "-p", "M-x", "-w", xwinid, NULL))
+			perror("execlp(dmenu)");
+	}
+
+	/* Parent writes to pipe[1] and reads from bike[0] */
+	close(pipefd[0]);
+	close(bikefd[1]);
+
+	static Cmd * pchoices[sizeof(choices)/sizeof(choices[0])];
+	static int pchoices_initialized = 0;
+	if (!pchoices_initialized) {
+		for (i = 0; i < sizeof(choices)/sizeof(choices[0]); i++)
+			pchoices[i] = &choices[i];
+		pchoices_initialized = 1;
+	}
+
+	for(i = 0; i < sizeof(choices)/sizeof(choices[0]); i++) {
+		s = pchoices[i]->cmdname;
+		len = strlen(s);
+		maxlen = (len > maxlen) ? len : maxlen;
+		if (len > buflen - 1)
+			fprintf(stderr, "promptcmd: WARNING: choice string %s too long: %d: will be truncated: %d\n", s, len, buflen - 1);
+		write(pipefd[1], s, len);
+		if (i + 1 < sizeof(choices)/sizeof(choices[0]))
+			write(pipefd[1], "\n", 1);
+	}
+
+	close(pipefd[1]);	/* Reader will see EOF */
+	wait(NULL); 		/* wait for the child */
+
+	for(pos = 0;
+	    (nread = read(bikefd[0], &buf[pos], buflen - pos)) > 0;
+	    pos += nread);
+
+	close(bikefd[0]);
+
+	// null terminate buf. this chops off trailing newline if it
+	// fit, and truncates it if it did not fit.
+	buf[pos ? pos - 1 : 0] = 0;
+
+	// If a non-NULL position pointer was supplied, return the
+	// index into choices which was selected in it.  Stop at the
+	// first match.  This is certainly the wrong result when
+	// multiple choice strings have been truncated to the same
+	// prefix.
+
+	for (i = 0; i < sizeof(choices)/sizeof(choices[0]); i++) {
+		s = pchoices[i]->cmdname;
+		if (strncmp(s, buf, buflen - 1) == 0) {
+			int j;
+			if (i != 0)
+				for (j = 0; j < i; j++) {
+					Cmd * tmp = pchoices[j];
+					pchoices[j] = pchoices[i];
+					pchoices[i] = tmp;
+				}
+			if (pchoices[0]->wyebrun)
+				run(w, pchoices[0]->wyebrun, (pchoices[0]->arg).v);
+			else
+				pchoices[0]->func(w, &(pchoices[0]->arg));
+			return;
+		}
+	}
+	if (buf[0])
+		fprintf(stderr, "promptcmd: WARNING: unknown command %s\n",
+			buf);
 }
