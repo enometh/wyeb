@@ -149,8 +149,16 @@ typedef struct {
 
 void foo(Win *w, const Arg *a) { fprintf(stderr, "foo: win->sxid=%s\n", w->sxid); }
 
+static void send(Win *win, Coms type, char *args); // fwd decl
+void w3mmode_set_status(Win *w, const Arg *a) { send(w, Cw3mmode, (char *) a->v); }
+
 static Cmd choices[] = {
 	{ "foo",		foo,	{ 0 } },
+	{ "w3mmode-one", w3mmode_set_status, { .v = "one" } },
+	{ "w3mmode-same-host", w3mmode_set_status, { .v = "same_host" } },
+	{ "w3mmode-off", w3mmode_set_status, { .v = "off" } },
+	{ "w3mmode-status", w3mmode_set_status, { .v = "status" } },
+	{ "w3mmode-use-conf", w3mmode_set_status, { .v = "use_conf" } },
 };
 
 void surf_cmdprompt(Win *w)
