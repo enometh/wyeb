@@ -151,6 +151,8 @@ void foo(Win *w, const Arg *a) { fprintf(stderr, "foo: win->sxid=%s\n", w->sxid)
 
 static void send(Win *win, Coms type, char *args); // fwd decl
 void w3mmode_set_status(Win *w, const Arg *a) { send(w, Cw3mmode, (char *) a->v); }
+static void viewsourceorheaders(Win *win, viewsourceorheaders_mode flag);
+void cmd_viewsourceorheaders(Win *w, const Arg *a) { viewsourceorheaders(w, a->i); }
 
 static Cmd choices[] = {
 	{ "foo",		foo,	{ 0 } },
@@ -159,6 +161,9 @@ static Cmd choices[] = {
 	{ "w3mmode-off", w3mmode_set_status, { .v = "off" } },
 	{ "w3mmode-status", w3mmode_set_status, { .v = "status" } },
 	{ "w3mmode-use-conf", w3mmode_set_status, { .v = "use_conf" } },
+	{ "view-html", cmd_viewsourceorheaders, { .i = VSH_HTML } },
+	{ "view-source", cmd_viewsourceorheaders, { .i = VSH_SOURCE } },
+	{ "view-headers", cmd_viewsourceorheaders, { .i = VSH_HEADERS } },
 };
 
 void surf_cmdprompt(Win *w)
