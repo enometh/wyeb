@@ -150,9 +150,46 @@ typedef struct {
 void foo(Win *w, const Arg *a) { fprintf(stderr, "foo: win->sxid=%s\n", w->sxid); }
 
 static void send(Win *win, Coms type, char *args); // fwd decl
+static void resetconf(Win *, const char*, int);	   //fwd decl
 void w3mmode_set_status(Win *w, const Arg *a) { send(w, Cw3mmode, (char *) a->v); }
 static void viewsourceorheaders(Win *win, viewsourceorheaders_mode flag);
 void cmd_viewsourceorheaders(Win *w, const Arg *a) { viewsourceorheaders(w, a->i); }
+
+void cmd_send_set3(Win *win, const Arg *a) {
+	const char *arg = a->v;
+	if (win->overset == NULL) {
+		win->overset = g_strdup(arg);
+		return;
+	}
+	char **elems = g_strsplit(win->overset, "/", 5);
+	int i, nelem = 0, found = -1;
+	for(i = 0; elems[i]; nelem++, i++) {
+		if (strcmp(elems[i], a->v) == 0) {
+			found = i;
+		}
+	}
+	if (found > -1) {	// remove it
+		if (nelem == 1) {
+			GFA(win->overset, NULL);
+		} else {
+			int j;
+			char * tmp = elems[i]; // block shift left
+			for (j = found; elems[j+1]; j++) elems[j] = elems[j+1];
+			g_assert(elems[j+1] == NULL);
+			elems[j] = NULL;
+			GFA(win->overset, g_strjoinv("/", elems));
+			elems[j] = tmp;	// so strv can free it
+		}
+	} else if (strcmp(win->overset, "") == 0) {
+		GFA(win->overset, g_strdup(arg));
+	} else {
+		char *tmp = g_strdup_printf("%s/%s", arg, win->overset);
+		g_free(win->overset);
+		win->overset = tmp;
+	}
+	g_strfreev(elems);
+	resetconf(win, NULL, 2);
+}
 
 static Cmd choices[] = {
 	{ "foo",		foo,	{ 0 } },
@@ -164,6 +201,9 @@ static Cmd choices[] = {
 	{ "view-html", cmd_viewsourceorheaders, { .i = VSH_HTML } },
 	{ "view-source", cmd_viewsourceorheaders, { .i = VSH_SOURCE } },
 	{ "view-headers", cmd_viewsourceorheaders, { .i = VSH_HEADERS } },
+	{ "toggle-javascript", cmd_send_set3, { .v = "script" } },
+	{ "toggle-images", cmd_send_set3, { .v = "image" } },
+	{ "toggle-reldomain", cmd_send_set3, { .v = "rel" } },
 };
 
 void surf_cmdprompt(Win *w)
