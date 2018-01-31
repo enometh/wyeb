@@ -204,7 +204,9 @@ static Cmd choices[] = {
 	{ "toggle-javascript", cmd_send_set3, { .v = "script" } },
 	{ "toggle-images", cmd_send_set3, { .v = "image" } },
 	{ "toggle-reldomain", cmd_send_set3, { .v = "rel" } },
-};
+	{ "save-source", NULL, { 0 }, "savesource" },
+	{ "save-mhtml", NULL, { 0 }, "savemhtml" },
+ };
 
 void surf_cmdprompt(Win *w)
 {
