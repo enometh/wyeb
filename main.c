@@ -386,6 +386,46 @@ static void pushimg(Win *win, bool swap)
 }
 static char *histfile;
 static char *lasthist;
+
+static int archivehistory(const char *current)
+{
+	struct stat info;
+	int ret = stat(current, &info);
+	if (ret < 0) {
+		fprintf(stderr, "archivehistory: couldn't stat %s: ", current);
+		perror(""); return ret;
+	}
+	char subdir[25];
+	struct tm tm;
+	localtime_r(&(info.st_mtime), &tm);
+	ret = strftime(subdir, sizeof(subdir), "archive-%Y-%m", &tm);
+	if (ret == 0) return -1;
+	char *archivedir = g_build_filename(histdir, subdir, NULL);
+	char *archivepath = NULL;
+	for (int i = 1; i < 100; i++) {
+		char filename[25];
+		snprintf(filename, sizeof(filename), "h%d.txt", i);
+		GFA(archivepath, g_build_filename(archivedir, filename, NULL));
+		if (!g_file_test(archivepath, G_FILE_TEST_EXISTS)) break;
+	}
+	g_assert(!g_file_test(archivepath, G_FILE_TEST_EXISTS));
+	ret = g_mkdir_with_parents(archivedir, 0700);
+	if (ret < 0) {
+		fprintf(stderr, "archivehistory: error creating dir %s:\n",
+			archivedir);
+		perror("");
+	} else {
+		ret = rename(current, archivepath);
+		if (ret < 0) {
+			fprintf(stderr, "archivehistory: error renaming %s to %s\n", current, archivepath);
+			perror("");
+		}
+	}
+	g_free(archivepath);
+	g_free(archivedir);
+	return ret;
+}
+
 static gboolean histcb(Win *win)
 {
 	if (!isin(wins, win)) return false;
@@ -432,6 +472,7 @@ static gboolean histcb(Win *win)
 		if (++ci >= histfnum) ci = 0;
 
 		GFA(histfile, g_build_filename(histdir, hists[ci], NULL))
+		archivehistory(histfile);
 		FILE *f = fopen(histfile, "w");
 		fclose(f);
 		csize = 0;
