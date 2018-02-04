@@ -5439,8 +5439,9 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 	gtk_window_add_accel_group(win->win, accelg);
 	//workaround. without get_inspector inspector doesen't work
 	//and have to grab forcus;
-	SIGW(webkit_web_view_get_inspector(win->kit),
-			"detach", detachcb, win->kitw);
+// inspector fail
+//	SIGW(webkit_web_view_get_inspector(win->kit),
+//			"detach", detachcb, win->kitw);
 
 	win->set = webkit_settings_new();
 	setprops(win, conf, DSET);
