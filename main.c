@@ -5257,6 +5257,15 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 {
 	Win *win = g_new0(Win, 1);
 	win->userreq = true;
+
+/*
+#ifdef GDK_WINDOWING_X11
+	Window parent_xid= getenv("XEMBED")!=NULL?strtol(getenv("XEMBED"),NULL,0):0;
+	if (parent_xid)
+		plugto = parent_xid;
+#endif
+*/
+
 	win->winw =
 #ifdef GDK_WINDOWING_X11
 		plugto ? gtk_plug_new(plugto) :
