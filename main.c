@@ -5160,6 +5160,7 @@ void enticon(Win *win, const char *name)
 }
 static gboolean focusincb(Win *win)
 {
+	//fprintf(stderr, "\nFOCUSINCB %lxd\n\n", win->xid);
 	if (gtk_widget_get_visible(win->entw))
 		tonormal(win);
 	return false;
