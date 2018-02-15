@@ -151,9 +151,11 @@ void foo(Win *w, const Arg *a) { fprintf(stderr, "foo: win->sxid=%s\n", w->sxid)
 
 static void send(Win *win, Coms type, const char *args); // fwd decl
 static void resetconf(Win *, const char*, int);	   //fwd decl
+static void eval_javascript(Win *win, const char *script); //fwd decl
 void w3mmode_set_status(Win *w, const Arg *a) { send(w, Cw3mmode, (char *) a->v); }
 static void viewsourceorheaders(Win *win, viewsourceorheaders_mode flag);
 void cmd_viewsourceorheaders(Win *w, const Arg *a) { viewsourceorheaders(w, a->i); }
+void cmd_js(Win *w, const Arg *a) {eval_javascript(w, a->v); }
 
 void cmd_send_set3(Win *win, const Arg *a) {
 	const char *arg = a->v;
@@ -191,6 +193,9 @@ void cmd_send_set3(Win *win, const Arg *a) {
 	resetconf(win, NULL, 2);
 }
 
+
+#define JS_F "function replace(reg,rep){old=window.document.documentElement.innerHTML;window.document.documentElement.innerHTML=old.replace(RegExp(reg,\"g\"),rep);}function displaynone(){replace(\"display:[\\t]*none\",\"\")}function dump(string){console.log(string);}function hide(tagname){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 if(elem.style.display!=\"none\"){		elem.style.display=\"none\";		count++	}	}}dump(\"hide(\"+tagname+\"):\"+count+\"\\n\");return count;}function showtag(tagname){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 if(elem.style.display==\"none\"){		elem.style.display=\"\";		count++	}	}}dump(\"showtag(\"+tagname+\"):\"+count+\"\\n\");return count;}function settags(tagname,attribute,value){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 elem.style.setProperty(attribute,value);	 count++;	}}dump(\"settag(tag=\"+tagname+\",attr=\"+attribute+\",val=\",	value+\"):\"+count+\"\\n\");return count;}function hideClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){	 if(elem.style.display!=\"none\"){		elem.style.display=\"none\";		count++	}	}}dump(\"hideClass(\"+name+\"):\"+count+\"\\n\");return count;}function purgeClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){		elem.parentNode.removeChild(elem);		count++;	}}dump(\"purgeClass(\"+name+\"):\"+count+\"\\n\");return count;}function showClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){	 if(elem.style.display==\"none\"){		elem.style.display=\"\";		count++	}	}}dump(\"showClass(\"+name+\"):\"+count+\"\\n\");return count;}function setClassAttr(className,attribute,value){count=0;for(var elem of document.getElementsByClassName(className)){	if(elem instanceof Element){	 elem.style.setProperty(attribute,value);	 count++;	}}dump(\"setClassAttr(class=\"+className+\",attr=\"+attribute+\",val=\",	value+\"):\"+count+\"\\n\");return count;}"
+
 static Cmd choices[] = {
 	{ "foo",		foo,	{ 0 } },
 	{ "w3mmode-one", w3mmode_set_status, { .v = "one" } },
@@ -206,7 +211,10 @@ static Cmd choices[] = {
 	{ "toggle-reldomain", cmd_send_set3, { .v = "rel" } },
 	{ "save-source", NULL, { 0 }, "savesource" },
 	{ "save-mhtml", NULL, { 0 }, "savemhtml" },
- };
+	{ "toggle-stylesheets", cmd_js, { . v =  "var s = window.document.styleSheets; for (var i = 0; i < s.length; i++) s[i].disabled = !s[i].disabled; \"cookie\";" } },
+	{ "twitter", cmd_js, { . v = "{hide(\"svg\");hide(\"button\");setClassAttr(\"PlayableMedia-player\",\"padding-bottom\",\"0\");setClassAttr(\"AdaptiveMedia-singlePhoto\",\"padding-top\",\"0\");hideClass(\"dismiss-module\");}" } },
+	{ "musings", cmd_js, { . v = "{replace(\"font-size:[^;]+;\",\"\");replace(\"font-family:[^;]+;\",\"\");}" } }
+};
 
 void surf_cmdprompt(Win *w)
 {
