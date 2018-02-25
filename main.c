@@ -2910,6 +2910,13 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 		Z("w3mmode", send(win, Cw3mmode, (char *)arg))
 		Z("offline", send(win, Coffline, (char *)arg))
 
+		// forward scrollposition request to the webprocess
+		Z("setscrollposition",
+			send(win, Cscrollposition, (char *)arg))
+		// save scrollposition response from the webprocess
+		Z("scrollposition",
+			_showmsg(win, g_strdup_printf("scroll position is %s", arg)))
+
 	}
 
 	Z("tonormal"    , win->mode = Mnormal)

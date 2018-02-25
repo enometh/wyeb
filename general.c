@@ -105,6 +105,7 @@ typedef enum {
 
 	Cw3mmode= '3',
 	Coffline= 'K',
+	Cscrollposition = 32,
 } Coms;
 
 
