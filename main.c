@@ -51,11 +51,20 @@ typedef enum {
 } viewsourceorheaders_mode;
 
 typedef struct {
+	long h;
+	long v;
+} Adj;
+
+// kludge to get scroll position from webprocess
+static Adj *scroll_adj = NULL;
+
+typedef struct {
 	char * uri;
 	char *mimetype;
 	viewsourceorheaders_mode mode;
 	GBytes *source;
 	GBytes *headers;
+	Adj source_adj, headers_adj, page_adj;
 } viewsourceorheader_info;
 
 typedef struct _Spawn Spawn;
@@ -167,6 +176,7 @@ typedef struct _WP {
 	Display *dpy;
 
 	viewsourceorheader_info v;
+	Adj * page_adj;
 } Win;
 
 struct _Spawn {
@@ -2502,6 +2512,35 @@ void vsh_clear(Win *win)
 	win->v.source = NULL;
 	if (win->v.headers) g_bytes_unref(win->v.headers);
 	win->v.headers = NULL;
+	win->v.source_adj.h = win->v.source_adj.v =
+		win->v.headers_adj.h = win->v.headers_adj.v =
+		win->v.page_adj.h = win->v.page_adj.v = 0;
+}
+
+// store the current page scroll position in one of
+// win->v.{source,headers,page}_adj depending on the vsh mode.  Note:
+// The storing is actually done in _run(), which stores the response
+// from the webprocess in the global location page_adj.
+static void save_adj(Win *win)
+{
+	switch (win->v.mode) {
+	case VSH_SOURCE: scroll_adj = &(win->v.source_adj); break;
+	case VSH_HEADERS: scroll_adj = &(win->v.headers_adj); break;
+	default:
+	case VSH_HTML: scroll_adj = &(win->v.page_adj); break;
+	}
+	fprintf(stderr, "save_adj: %p\n", scroll_adj);
+	// this is an asynchronous to the webprocess to return the
+	// scoll position.  response will be saved in scroll_adj.
+	send(win, Cscrollposition, "-");
+}
+
+//  Note: Restoring a saved position is done in loadcb() which will
+//  asynchronously request the webprocess to set the scroll position
+//  to the values it finds in the location win->page_adj.
+static void restore_adj(Win *win, Adj *adj)
+{
+	win->page_adj = adj;
 }
 
 void
@@ -2551,23 +2590,27 @@ viewsourceorheaderscb(GObject *res, GAsyncResult *result, gpointer dest)
 		switch(win->v.mode) {
 		case VSH_SOURCE:
 			webkit_web_view_load_bytes(win->kit, win->v.source, "text/plain", "ISO-8895-1", URI(win));
+			restore_adj(win, &(win->v.source_adj));
 			break;
 		case VSH_HEADERS:
-			if (win->v.headers)
+			if (win->v.headers) {
 				webkit_web_view_load_bytes(win->kit, win->v.headers, "text/plain", "ISO-8895-1", URI(win));
-			else
+				restore_adj(win, &(win->v.headers_adj));
+			} else
 				fprintf(stderr, "viewsourceorheaderscb: load headers failed\n");
 			break;
 		case VSH_HTML:
 		default:
 			fprintf(stderr, "viewsourceorheaderscb: unexpected mode: %d\n", win->v.mode);
 			webkit_web_view_load_bytes(win->kit, win->v.source, win->v.mimetype, NULL, URI(win));
+			restore_adj(win, &(win->v.page_adj));
 		}
 	}
 }
 
 static void viewsourceorheaders(Win *win, viewsourceorheaders_mode flag)
 {
+	save_adj(win);
 	if (win->v.uri) {
 		if (strcmp(URI(win), win->v.uri) == 0) {
 			fprintf(stderr, "viewresourceorheaders: %d: orig=%d: same uri %s\n", flag, win->v.mode, win->v.uri);
@@ -2577,24 +2620,28 @@ static void viewsourceorheaders(Win *win, viewsourceorheaders_mode flag)
 					fprintf(stderr, "revert to html\n");
 					win->v.mode = VSH_HTML;
 					webkit_web_view_load_bytes(win->kit, win->v.source, win->v.mimetype, NULL, URI(win));
+					restore_adj(win, &(win->v.page_adj));
 				} else
 					fprintf(stderr, "no change\n");
 			} else if (flag == VSH_SOURCE) {
 				fprintf(stderr, "view source\n");
 				win->v.mode = VSH_SOURCE;
 				webkit_web_view_load_bytes(win->kit, win->v.source, "text/plain", "ISO-8895-1", URI(win));
+				restore_adj(win, &(win->v.source_adj));
 			} else if (flag == VSH_HTML) {
 				fprintf(stderr, "view html\n");
 				win->v.mode = VSH_HTML;
 				webkit_web_view_load_bytes(win->kit, win->v.source, win->v.mimetype, NULL, URI(win));
+				restore_adj(win, &(win->v.page_adj));
 			} else {
 				fprintf(stderr, "view headers\n");
 				g_assert(flag == VSH_HEADERS);
 				int orig = win->v.mode;
 				win->v.mode = VSH_HEADERS;
-				if (win->v.headers)
+				if (win->v.headers) {
 					webkit_web_view_load_bytes(win->kit, win->v.headers, "text/plain", "ISO-8895-1", URI(win));
-				else {
+					restore_adj(win, &(win->v.headers_adj));
+				} else {
 					win->v.mode = orig;
 					fprintf(stderr, "viewresourceorheaders: no headers on back button: reset mode to: %d\n", orig);
 				}
@@ -2983,6 +3030,15 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			send(win, Cscrollposition, (char *)arg))
 		// save scrollposition response from the webprocess
 		Z("scrollposition",
+			if (scroll_adj) {
+				int n = sscanf(arg, "%lu %lu", &(scroll_adj->h), &(scroll_adj->v));
+				if (n != 2) {
+					fprintf(stderr, "main: failed to parse scollposition from ext: %s\n", arg);
+				} else {
+					// fprintf(stderr, "main: scrollposition: storing to %p: %lu %lu\n", scroll_adj, scroll_adj->h, scroll_adj->v);
+				}
+				scroll_adj = 0;
+			}
 			_showmsg(win, g_strdup_printf("scroll position is %s", arg)))
 
 	}
@@ -4889,6 +4945,17 @@ static void loadcb(WebKitWebView *k, WebKitLoadEvent event, Win *win)
 	case WEBKIT_LOAD_FINISHED:
 		D(WEBKIT_LOAD_FINISHED %s, URI(win))
 		win->maychanged = false;
+
+		// restore_adj: tell webprocess to asynchronously set
+		// the page position to what was stored
+		if (win->page_adj) {
+			char *pstr = g_strdup_printf("%lu %lu", win->page_adj->h, win->page_adj->v);
+			//fprintf(stderr, "restore_adj: %p: %s\n", win->page_adj, pstr);
+			send(win, Cscrollposition, pstr);
+			g_free(pstr);
+			win->page_adj = 0;
+		}
+
 
 		if (g_strcmp0(win->lastreset, URI(win)))
 		{ //for load-failed before commit e.g. download
