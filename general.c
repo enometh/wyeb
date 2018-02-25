@@ -123,6 +123,7 @@ typedef enum {
 	Cfree   = 'F',
 	Cw3mmode= '3',
 	Coffline= 'K',
+	Cscrollposition = 32,
 } Coms;
 
 

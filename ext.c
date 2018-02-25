@@ -1624,6 +1624,33 @@ static void blur(let doc)
 	g_object_unref(selection);
 }
 
+static void
+scrollposition(Page *page, char *arg)
+{
+	WebKitDOMDocument *doc = webkit_web_page_get_dom_document(page->kit);
+	WebKitDOMDOMWindow *win = webkit_dom_document_get_default_view(doc);
+	if ((strcmp(arg, "") == 0) // return scroll position
+	    || strcmp(arg, "-") == 0) // non-empty action argument
+	{
+		//fprintf(stderr, "ext handling getscrollposition %s\n", arg);
+		long x = webkit_dom_dom_window_get_scroll_x (win);
+		long y = webkit_dom_dom_window_get_scroll_y (win);
+		char * pstr = g_strdup_printf("%lu %lu", x, y);
+		send(page, "scrollposition", pstr);
+		g_free(pstr);
+		return;
+	}
+	fprintf(stderr, "ext handling setscrollposition %s\n", arg);
+	double x = 0, y = 0;
+	int n = sscanf(arg, "%lg %lg", &x, &y);
+	if (n == 2) {
+		//fprintf(stderr, "ext - setting scroll to %lg %lg\n", x, y);
+		webkit_dom_dom_window_scroll_to(win, x, y);
+	} else {
+		fprintf(stderr, "ext: scrollposition: did not parse %s\n", arg);
+	}
+}
+
 static void halfscroll(Page *page, bool d)
 {
 	let win = defaultview(sdoc(page));
@@ -1819,6 +1846,9 @@ void ipccb(const char *line)
 			offline = false;
 		send(page, "offline_status", offline ? "true" : "false");
 		break;
+
+	case Cscrollposition:
+		scrollposition(page, arg);
 	}
 
 	g_strfreev(args);
