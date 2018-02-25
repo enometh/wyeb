@@ -1635,9 +1635,9 @@ scrollposition(Page *page, char *arg)
 	    || strcmp(arg, "-") == 0) // non-empty action argument
 	{
 		//fprintf(stderr, "ext handling getscrollposition %s\n", arg);
-		long x = webkit_dom_dom_window_get_scroll_x (win);
-		long y = webkit_dom_dom_window_get_scroll_y (win);
-		char * pstr = g_strdup_printf("%lu %lu", x, y);
+		long x = webkit_dom_dom_window_get_scroll_x(win);
+		long y = webkit_dom_dom_window_get_scroll_y(win);
+		char *pstr = g_strdup_printf("%lu %lu", x, y);
 		send(page, "scrollposition", pstr);
 		g_free(pstr);
 		return;
