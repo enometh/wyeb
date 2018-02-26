@@ -139,8 +139,8 @@ typedef struct {
 	char *desc;
 } Conf;
 static Conf dconf[] = {
-	{"all"   , "winwidth"     , "1000"},
-	{"all"   , "winheight"    , "1000"},
+	{"all"   , "winwidth"     , "800"},
+	{"all"   , "winheight"    , "600"},
 	{"all"   , "zoom"         , "1.000"},
 	{"all"   , "ignoretlserr" , "false"},
 	{"all"   , "itp"          , "false"},
@@ -160,9 +160,15 @@ static Conf dconf[] = {
 	{"boot"  , "ephemeral"    , "false"},
 	{"boot"  , "unsetGTK_OVERLAY_SCROLLING", "true", "workaround"},
 
-	{"search", DSEARCHKEY     , DSEARCH},
-	{"search", "f"            , "https://www.google.com/search?q=%s&btnI=I"},
+//	{"search", DSEARCHKEY     , DSEARCH},
+//	{"search", "f"            , "https://www.google.com/search?q=%s&btnI=I"},
+
+	{"search", "b"            , "https://www.bing.com/?q=%s"},
+	{"search", "d"            , "https://duckduckgo.com/html/?q=%s"},
+	{"search", "g"            , "https://www.google.co.in/search?num=50&hl=en&q=%s&gbv=1"},
 	{"search", "u"            , "https://www.urbandictionary.com/define.php?term=%s"},
+	{"search", "o"            , "https://en.lexico.com/en/definition/%s"},
+	{"search", "w"            , "https://en.wikipedia.org/wiki/%s"},
 
 	{"template", "na"         , "%s"},
 	{"template", "h"          , "http://%s"},
@@ -170,6 +176,7 @@ static Conf dconf[] = {
 	{"set:v"     , "enable-caret-browsing", "true"},
 	{"set:v"     , "hackedhint4js"        , "false"},
 	{"set:script", "enable-javascript"    , "true"},
+	{"set:rel",    "reldomaindataonly"    , "false"},
 	{"set:image" , "auto-load-images"     , "true"},
 	{"set:image" , "linkformat"   , "[![]("APP":F) %.40s ](%s)"},
 	{"set:image" , "linkdata"     , "tu"},
@@ -189,9 +196,9 @@ static Conf dconf[] = {
 	{DSET    , "userscripts"      , ""},
 	{DSET    , "search"           , DSEARCHKEY, "search="DSEARCH},
 	{DSET    , "searchstrmax"     , "99"},
-	{DSET    , "addressbar"       , "false"},
+	{DSET    , "addressbar"       , "true"},
 	{DSET    , "msgcolor"         , "#c07"},
-	{DSET    , "msgmsec"          , "600"},
+	{DSET    , "msgmsec"          , "2000"},
 	{DSET    , "keepfavicondb"    , "false"},
 	{DSET    , "newwinhandle"     , "normal", "notnew | ignore | back | normal"},
 	{DSET    , "scriptdialog"     , "true"},
@@ -200,9 +207,9 @@ static Conf dconf[] = {
 	{DSET    , "adblock"          , "true",
 		"\nloading\n\nadblock has a point only while "APP"adblock is working."
 	},
-	{DSET    , "reldomaindataonly", "false"},
+	{DSET    , "reldomaindataonly", "true"},
 	{DSET    , "reldomaincutheads", "www.;wiki.;bbs.;developer."},
-	{DSET    , "showblocked"      , "false"},
+	{DSET    , "showblocked"      , "true"},
 	{DSET    , "stdoutheaders"    , "false"},
 	{DSET    , "removeheaders"    , "",
 		"removeheaders=Upgrade-Insecure-Requests;Referer;"},
@@ -226,10 +233,10 @@ static Conf dconf[] = {
 		"dlmimetypes=*"},
 	{DSET    , "dlsubdir"         , ""},
 	{DSET    , "dlwinback"        , "true"},
-	{DSET    , "dlwinclosemsec"   , "3000"},
+	{DSET    , "dlwinclosemsec"   , "10000"},
 
 	//script
-	{DSET    , "spawnmsg"         , "false", "\nscript\n"},
+	{DSET    , "spawnmsg"         , "true", "\nscript\n"},
 
 	{DSET    , "onstartmenu"      , "",
 		"onstartmenu exec a file in the menu dir when load started before redirect"},
@@ -262,6 +269,16 @@ static Conf dconf[] = {
 	//{DSET      , "enable-plugins"   , "false"},
 	//{DSET      , "enable-java"      , "false"},
 	//{DSET      , "enable-fullscreen", "false"},
+
+	{DSET      , "default-font-size", "17"},
+	{DSET      , "default-monospace-font-size", "17"},
+	{DSET      , "minimum-font-size", "14"},
+	{DSET      , "default-font-family", "Serif"},
+//	{DSET      , "enable-developer-extras, "false"},
+	{DSET      , "enable-site-specific-quirks", "false"},
+	{DSET      , "enable-write-console-messages-to-stdout", "true"},
+	{DSET      , "allow-file-access-from-file-urls", "true"},
+
 };
 #ifdef MAINC
 static bool confbool(char *key)
@@ -498,7 +515,7 @@ static void initconf(GKeyFile *kf)
 
 	const char *sample = "uri:^https?://(www\\.)?foo\\.bar/.*";
 
-	g_key_file_set_boolean(conf, sample, "enable-javascript", true);
+	g_key_file_set_boolean(conf, sample, "enable-javascript", false);
 	g_key_file_set_comment(conf, sample, NULL,
 			"After 'uri:' is regular expressions for the setting set.\n"
 			"preferential order of groups: lower > upper > '"DSET"'"
