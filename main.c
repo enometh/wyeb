@@ -2706,8 +2706,8 @@ static Keybind dkeys[]= {
 
 	{"pagedown"      , 'f', GDK_CONTROL_MASK},
 	{"pageup"        , 'b', GDK_CONTROL_MASK},
-	{"halfdown"      , 'd', GDK_CONTROL_MASK},
-	{"halfup"        , 'u', GDK_CONTROL_MASK},
+//	{"halfdown"      , 'd', GDK_CONTROL_MASK},
+//	{"halfup"        , 'u', GDK_CONTROL_MASK},
 
 	{"top"           , 'g', 0},
 	{"bottom"        , 'G', 0},
@@ -2718,8 +2718,8 @@ static Keybind dkeys[]= {
 	//tab
 	{"nextwin"       , 'J', 0},
 	{"prevwin"       , 'K', 0},
-	{"quitnext"      , 'x', 0, "Raise next win and quit current win"},
-	{"quitprev"      , 'X', 0},
+//	{"quitnext"      , 'x', 0, "Raise next win and quit current win"},
+//	{"quitprev"      , 'X', 0},
 	{"winlist"       , 'z', 0},
 
 	{"back"          , 'H', 0},
@@ -2755,7 +2755,8 @@ static Keybind dkeys[]= {
 	{"showhistoryall", 'm', GDK_CONTROL_MASK},
 	{"showmainpage"  , 'm', 0},
 
-	{"clearallwebsitedata", 'C', GDK_CONTROL_MASK},
+
+//	{"clearallwebsitedata", 'C', GDK_CONTROL_MASK},
 	{"edit"          , 'e', 0, "Edit current uri conf or mainpage"},
 	{"editconf"      , 'E', 0},
 	{"openconfigdir" , 'c', 0},
