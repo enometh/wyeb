@@ -457,9 +457,15 @@ static gboolean histcb(Win *win)
 		{
 			GFA(histfile, g_build_filename(histdir, hists[ci], NULL))
 			struct stat info;
-			if (stat(histfile, &info) != -1 &&
-					(csize = info.st_size) < MAXSIZE)
-				break;
+			if (stat(histfile, &info) == -1) {
+				fprintf(stderr, "stat %s failed\n", histfile);
+				csize = 0;
+				break; //first time. errno == ENOENT
+			} else {
+				csize = info.st_size;
+				if (csize < MAXSIZE)
+					break;
+			}
 		}
 	}
 
