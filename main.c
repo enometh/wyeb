@@ -163,6 +163,9 @@ typedef struct _WP {
 	//misc
 	bool    scheme;
 	GTlsCertificateFlags tlserr;
+	GTlsCertificate *cert, *failedcert;
+	int errorpage;
+
 	char   *fordl;
 	guint   msgfunc;
 
@@ -4862,6 +4865,57 @@ surfrunscript(Win *win)
 	g_free(script);
 }
 
+static gboolean
+loadtlsfailcb(WebKitWebView *k, char *uri, GTlsCertificate *cert,
+	      GTlsCertificateFlags err, Win *win)
+{
+	GString *errmsg = g_string_new(NULL);
+	char *html, *pem;
+
+	fprintf(stderr, "LOAD FAILED WITH TLS ERRORS\n");
+
+
+	win->failedcert = g_object_ref(cert);
+	win->tlserr = err;
+	win->errorpage = 1;
+	if (err & G_TLS_CERTIFICATE_UNKNOWN_CA)
+		g_string_append(errmsg,
+		    "The signing certificate authority is not known.<br>");
+	if (err & G_TLS_CERTIFICATE_BAD_IDENTITY)
+		g_string_append(errmsg,
+		    "The certificate does not match the expected identity "
+		    "of the site that it was retrieved from.<br>");
+	if (err & G_TLS_CERTIFICATE_NOT_ACTIVATED)
+		g_string_append(errmsg,
+		    "The certificate's activation time "
+		    "is still in the future.<br>");
+	if (err & G_TLS_CERTIFICATE_EXPIRED)
+		g_string_append(errmsg, "The certificate has expired.<br>");
+	if (err & G_TLS_CERTIFICATE_REVOKED)
+		g_string_append(errmsg,
+		    "The certificate has been revoked according to "
+		    "the GTlsConnection's certificate revocation list.<br>");
+	if (err & G_TLS_CERTIFICATE_INSECURE)
+		g_string_append(errmsg,
+		    "The certificate's algorithm is considered insecure.<br>");
+	if (err & G_TLS_CERTIFICATE_GENERIC_ERROR)
+		g_string_append(errmsg,
+		    "Some error occurred validating the certificate.<br>");
+
+	g_object_get(cert, "certificate-pem", &pem, NULL);
+	html = g_strdup_printf("<p>Could not validate TLS for “%s”<br>%s</p>"
+	                       "<p>You can inspect the following certificate "
+	                       "with Ctrl-t (default keybinding).</p>"
+	                       "<p><pre>%s</pre></p>", uri, errmsg->str, pem);
+	g_free(pem);
+	g_string_free(errmsg, TRUE);
+
+	webkit_web_view_load_alternate_html(win->kit, html, uri, /*NULL*/ uri);
+	g_free(html);
+	return TRUE;
+//	return FALSE;   defer to failcb
+}
+
 static void loadcb(WebKitWebView *k, WebKitLoadEvent event, Win *win)
 {
 	win->crashed = false;
@@ -4875,6 +4929,11 @@ static void loadcb(WebKitWebView *k, WebKitLoadEvent event, Win *win)
 		setresult(win, NULL);
 		GFA(win->focusuri, NULL)
 		win->tlserr = 0;
+
+		if (win->errorpage)
+			win->errorpage = 0;
+		else
+			g_clear_object(&win->failedcert);
 
 		if (win->mode == Minsert) send(win, Cblur, NULL); //clear im
 		tonormal(win);
@@ -4913,9 +4972,8 @@ static void loadcb(WebKitWebView *k, WebKitLoadEvent event, Win *win)
 
 		send(win, Con, "c");
 
-		if (webkit_web_view_get_tls_info(win->kit, NULL, &win->tlserr))
+		if (webkit_web_view_get_tls_info(win->kit, &win->cert, &win->tlserr))
 			if (win->tlserr) showmsg(win, "TLS Error");
-
 		setspawn(win, "onloadmenu");
 		break;
 	case WEBKIT_LOAD_FINISHED:
@@ -5568,6 +5626,7 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 	SIGW(o, "script-dialog"        , sdialogcb , win);
 	SIG( o, "load-changed"         , loadcb    , win);
 	SIG( o, "load-failed"          , failcb    , win);
+	SIG( o, "load-failed-with-tls-errors", loadtlsfailcb, win);
 
 	SIG( o, "context-menu"         , contextcb , win);
 	SIG( o, "context-menu-dismissed", contextclosecb , win);
