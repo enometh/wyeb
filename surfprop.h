@@ -194,7 +194,33 @@ void cmd_send_set3(Win *win, const Arg *a) {
 }
 
 
+// this is meant to be called from a load-failed page from
+// loadtlsfailcb below. It relies on the fact that loadtlsfailcb calls
+// webkit_web_view_load_alternate_html with the same uri as the
+// base_uri. loadfailedtls should assert g_assert(v == c->view); note
+// that there is no way of blocking the host again with webkit
+
+static void
+cmd_add_security_exception(Win *win, const Arg *a)
+{
+	GTlsCertificate *cert = win->failedcert;
+	if (! win->failedcert) return;
+
+	fprintf(stderr, "ADD SECURITY EXCEPTION\n");
+	const char *uri = URI(win);
+	if ((uri = strstr(uri, "https://"))) {
+		uri += sizeof("https://") - 1;
+		// XXX make sure there is a slash first?
+		char * host = g_strndup(uri, strchr(uri, '/') - uri);
+		webkit_web_context_allow_tls_certificate_for_host(
+			webkit_web_view_get_context(win->kit), cert, host);
+		g_free(host);
+	}
+}
+
 #define JS_F "function replace(reg,rep){old=window.document.documentElement.innerHTML;window.document.documentElement.innerHTML=old.replace(RegExp(reg,\"g\"),rep);}function displaynone(){replace(\"display:[\\t]*none\",\"\")}function dump(string){console.log(string);}function hide(tagname){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 if(elem.style.display!=\"none\"){		elem.style.display=\"none\";		count++	}	}}dump(\"hide(\"+tagname+\"):\"+count+\"\\n\");return count;}function showtag(tagname){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 if(elem.style.display==\"none\"){		elem.style.display=\"\";		count++	}	}}dump(\"showtag(\"+tagname+\"):\"+count+\"\\n\");return count;}function settags(tagname,attribute,value){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 elem.style.setProperty(attribute,value);	 count++;	}}dump(\"settag(tag=\"+tagname+\",attr=\"+attribute+\",val=\",	value+\"):\"+count+\"\\n\");return count;}function hideClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){	 if(elem.style.display!=\"none\"){		elem.style.display=\"none\";		count++	}	}}dump(\"hideClass(\"+name+\"):\"+count+\"\\n\");return count;}function purgeClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){		elem.parentNode.removeChild(elem);		count++;	}}dump(\"purgeClass(\"+name+\"):\"+count+\"\\n\");return count;}function showClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){	 if(elem.style.display==\"none\"){		elem.style.display=\"\";		count++	}	}}dump(\"showClass(\"+name+\"):\"+count+\"\\n\");return count;}function setClassAttr(className,attribute,value){count=0;for(var elem of document.getElementsByClassName(className)){	if(elem instanceof Element){	 elem.style.setProperty(attribute,value);	 count++;	}}dump(\"setClassAttr(class=\"+className+\",attr=\"+attribute+\",val=\",	value+\"):\"+count+\"\\n\");return count;}"
+
+
 
 static Cmd choices[] = {
 	{ "foo",		foo,	{ 0 } },
@@ -213,7 +239,8 @@ static Cmd choices[] = {
 	{ "save-mhtml", NULL, { 0 }, "savemhtml" },
 	{ "toggle-stylesheets", cmd_js, { . v =  "var s = window.document.styleSheets; for (var i = 0; i < s.length; i++) s[i].disabled = !s[i].disabled; \"cookie\";" } },
 	{ "twitter", cmd_js, { . v = "{hide(\"svg\");hide(\"button\");setClassAttr(\"PlayableMedia-player\",\"padding-bottom\",\"0\");setClassAttr(\"AdaptiveMedia-singlePhoto\",\"padding-top\",\"0\");hideClass(\"dismiss-module\");}" } },
-	{ "musings", cmd_js, { . v = "{replace(\"font-size:[^;]+;\",\"\");replace(\"font-family:[^;]+;\",\"\");}" } }
+	{ "musings", cmd_js, { . v = "{replace(\"font-size:[^;]+;\",\"\");replace(\"font-family:[^;]+;\",\"\");}" } },
+	{ "add_security_exception", cmd_add_security_exception, { 0 } },
 };
 
 void surf_cmdprompt(Win *w)
