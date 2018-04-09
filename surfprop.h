@@ -224,6 +224,7 @@ cmd_add_security_exception(Win *win, const Arg *a)
 
 static Cmd choices[] = {
 	{ "foo",		foo,	{ 0 } },
+	{ "reload-with-charset", NULL, { 0 }, "surfcharset" },
 	{ "w3mmode-one", w3mmode_set_status, { .v = "one" } },
 	{ "w3mmode-same-host", w3mmode_set_status, { .v = "same_host" } },
 	{ "w3mmode-off", w3mmode_set_status, { .v = "off" } },
