@@ -449,12 +449,15 @@ static int archivehistory(const char *current)
 	return ret;
 }
 
+static int historyenabled = 1;
 static gboolean histcb(Win *win)
 {
 	if (!isin(wins, win)) return false;
 	win->histcb = 0;
 
 	if (!win) return false;
+	if (!historyenabled) return false;
+
 	if (strcmp(URI(win), getatom(win, atomGo)))
 		surfaddhist(URI(win));
 
@@ -3005,7 +3008,22 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 				name = "VIEWER (OFF)";
 			else if (model == WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER)
 				name = "DOCUMENT BROWSER";
-			_showmsg(win, g_strdup_printf("cachemodel = CACHE MODEL %s%s\n", name, (actionp ? ((model == old) ? "(unchanged)" : "(changed)") : "")), false))
+			_showmsg(win, g_strdup_printf("cachemodel = CACHE MODEL %s%s\n", name, (actionp ? ((model == old) ? "(unchanged)" : "(changed)") : ""))))
+
+		Z("historymode",
+			int actionp = 0;
+			int old = historyenabled;
+			if (strcmp(arg, "on") == 0) {
+			    actionp = 1;
+			    historyenabled = 1;
+			} else if (strcmp(arg, "off") == 0) {
+				actionp = 1;
+				historyenabled = 0;
+			} else if (arg && strcmp(arg, "status") == 0) { //noop
+			} else {
+				fprintf(stderr, "historymode: unknown arg %s\n", arg);
+			}
+			_showmsg(win, g_strdup_printf("historymode = %s%s\n", historyenabled ? "enabled" : "disabled", (actionp ? ((historyenabled == old) ? "(unchanged)" : "(changed)") : "")));)
 
 	}
 
