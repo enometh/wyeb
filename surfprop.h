@@ -243,6 +243,9 @@ static Cmd choices[] = {
 	{ "cache-on", NULL, { .v = "on" }, "cachemodel" },
 	{ "cache-off", NULL, { .v = "off" }, "cachemodel" },
 	{ "cache-status", NULL, { .v = "status" }, "cachemodel" },
+	{ "history-on", NULL, { .v = "on" }, "historymode" },
+	{ "history-off", NULL, { .v = "off" }, "historymode" },
+	{ "history-status", NULL, { .v = "status" }, "historymode" },
 };
 
 void surf_cmdprompt(Win *w)
