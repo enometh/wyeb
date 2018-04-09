@@ -220,8 +220,6 @@ cmd_add_security_exception(Win *win, const Arg *a)
 
 #define JS_F "function replace(reg,rep){old=window.document.documentElement.innerHTML;window.document.documentElement.innerHTML=old.replace(RegExp(reg,\"g\"),rep);}function displaynone(){replace(\"display:[\\t]*none\",\"\")}function dump(string){console.log(string);}function hide(tagname){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 if(elem.style.display!=\"none\"){		elem.style.display=\"none\";		count++	}	}}dump(\"hide(\"+tagname+\"):\"+count+\"\\n\");return count;}function showtag(tagname){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 if(elem.style.display==\"none\"){		elem.style.display=\"\";		count++	}	}}dump(\"showtag(\"+tagname+\"):\"+count+\"\\n\");return count;}function settags(tagname,attribute,value){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 elem.style.setProperty(attribute,value);	 count++;	}}dump(\"settag(tag=\"+tagname+\",attr=\"+attribute+\",val=\",	value+\"):\"+count+\"\\n\");return count;}function hideClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){	 if(elem.style.display!=\"none\"){		elem.style.display=\"none\";		count++	}	}}dump(\"hideClass(\"+name+\"):\"+count+\"\\n\");return count;}function purgeClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){		elem.parentNode.removeChild(elem);		count++;	}}dump(\"purgeClass(\"+name+\"):\"+count+\"\\n\");return count;}function showClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){	 if(elem.style.display==\"none\"){		elem.style.display=\"\";		count++	}	}}dump(\"showClass(\"+name+\"):\"+count+\"\\n\");return count;}function setClassAttr(className,attribute,value){count=0;for(var elem of document.getElementsByClassName(className)){	if(elem instanceof Element){	 elem.style.setProperty(attribute,value);	 count++;	}}dump(\"setClassAttr(class=\"+className+\",attr=\"+attribute+\",val=\",	value+\"):\"+count+\"\\n\");return count;}"
 
-
-
 static Cmd choices[] = {
 	{ "foo",		foo,	{ 0 } },
 	{ "reload-with-charset", NULL, { 0 }, "surfcharset" },
@@ -242,6 +240,9 @@ static Cmd choices[] = {
 	{ "twitter", cmd_js, { . v = "{hide(\"svg\");hide(\"button\");setClassAttr(\"PlayableMedia-player\",\"padding-bottom\",\"0\");setClassAttr(\"AdaptiveMedia-singlePhoto\",\"padding-top\",\"0\");hideClass(\"dismiss-module\");}" } },
 	{ "musings", cmd_js, { . v = "{replace(\"font-size:[^;]+;\",\"\");replace(\"font-family:[^;]+;\",\"\");}" } },
 	{ "add_security_exception", cmd_add_security_exception, { 0 } },
+	{ "cache-on", NULL, { .v = "on" }, "cachemodel" },
+	{ "cache-off", NULL, { .v = "off" }, "cachemodel" },
+	{ "cache-status", NULL, { .v = "status" }, "cachemodel" },
 };
 
 void surf_cmdprompt(Win *w)
