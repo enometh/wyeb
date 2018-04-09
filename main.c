@@ -2983,6 +2983,30 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			}
 			_showmsg(win, g_strdup_printf("scroll position is %s", arg)))
 
+		Z("cachemodel",
+		  	WebKitWebContext *ctx = webkit_web_view_get_context(win->kit);
+			WebKitCacheModel old = webkit_web_context_get_cache_model(ctx);
+			int actionp = 0;
+			if (strcmp(arg, "on") == 0) {
+				actionp = 1;
+				webkit_web_context_set_cache_model(ctx, WEBKIT_CACHE_MODEL_WEB_BROWSER);
+			} else if (strcmp(arg, "off") == 0) {
+				actionp = 1;
+				webkit_web_context_set_cache_model(ctx, WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
+			} else if (arg && strcmp(arg, "status") == 0) { //noop
+			} else {
+				fprintf(stderr, "cachemodel: unknown arg %s\n", arg);
+			}
+			char *name = "UNKNOWN";
+			WebKitCacheModel model = webkit_web_context_get_cache_model(ctx);
+			if (model == WEBKIT_CACHE_MODEL_WEB_BROWSER)
+				name = "BROWSER";
+			else if (model == WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER)
+				name = "VIEWER (OFF)";
+			else if (model == WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER)
+				name = "DOCUMENT BROWSER";
+			_showmsg(win, g_strdup_printf("cachemodel = CACHE MODEL %s%s\n", name, (actionp ? ((model == old) ? "(unchanged)" : "(changed)") : "")), false))
+
 	}
 
 	Z("tonormal"    , win->mode = Mnormal)
