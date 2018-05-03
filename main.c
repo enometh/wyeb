@@ -5878,6 +5878,23 @@ int main(int argc, char **argv)
 	//icon
 	GdkPixbuf *pix = gtk_icon_theme_load_icon(
 		gtk_icon_theme_get_default(), APP, 128, 0, NULL);
+	if (!pix) {
+		static cairo_surface_t *png = NULL;
+		png = cairo_image_surface_create_from_png(
+#if !DEBUG
+			"/usr/share/pixmaps/"
+#endif
+			"wyeb.png");
+		if (png) {
+			pix = gdk_pixbuf_get_from_surface
+				(png, 0, 0,
+				 cairo_image_surface_get_width(png),
+				 cairo_image_surface_get_height(png));
+		}
+		else {
+			g_print("icon file not loaded\n");
+		}
+	}
 	if (pix)
 	{
 		gtk_window_set_default_icon(pix);
