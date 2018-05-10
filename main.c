@@ -1830,26 +1830,21 @@ static int inwins(Win *win, GSList **list, bool onlylen)
 }
 static void nextwin(Win *win, bool next)
 {
-	GSList *list = NULL;
-
-	if (!inwins(win, &list, false))
-		return showmsg(win, "No other windows");
-
-	Win *nextwin = NULL;
-	if (next)
-	{
-		g_ptr_array_remove(wins, win);
-		g_ptr_array_add(wins, win);
-		present(nextwin = list->data); //present first to keep focus on xfce
-		if (!plugto)
-			gdk_window_lower(gdkw(win->winw));
-	}
-	else
-		present(nextwin = g_slist_last(list)->data);
-
-	nextwin->lastx = win->lastx;
-	nextwin->lasty = win->lasty;
-	g_slist_free(list);
+	guint index;
+	gboolean found = g_ptr_array_find(wins, win, &index);
+	if (found && wins->len > 1) {
+		int newindex;
+		if (next)
+			newindex = index == wins->len - 1 ?  0 : index + 1;
+		else
+			newindex = index == 0 ? wins->len - 1 : index - 1;
+		g_assert(0 <= newindex < wins->len);
+		Win *newwin = g_ptr_array_index(wins, newindex);
+		present(newwin); //present first to keep focus on xfce
+		//if (!plugto) gdk_window_lower(gdkw(win->winw));
+		newwin->lastx = win->lastx;
+		newwin->lasty = win->lasty;
+ 	}
 }
 static bool quitnext(Win *win, bool next)
 {
