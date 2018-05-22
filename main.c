@@ -4742,8 +4742,13 @@ static gboolean policycb(
 			resetconf(win, webkit_uri_response_get_uri(res), 0);
 		webkit_policy_decision_use(dec);
 	}
-	else
+	else if (dl)
 		webkit_policy_decision_download(dec);
+	else {
+		fprintf(stderr, "WIP: to fail\n");
+		webkit_policy_decision_use(dec);
+	}
+
 	return true;
 }
 static GtkWidget *createcb(WebKitWebView* k,
