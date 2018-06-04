@@ -20,6 +20,7 @@ all: wyeb ext.so
 
 wyeb: main.c general.c makefile surfprop.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< \
+		-D_GNU_SOURCE \
 		`pkg-config --cflags --libs gtk+-3.0 glib-2.0 $(WEBKIT)` \
 		-DEXTENSION_DIR=\"$(EXTENSION_DIR)$(VERDIR)\" \
 		-DDISTROURI=\"$(DISTROURI)\" \
