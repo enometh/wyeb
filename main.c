@@ -439,6 +439,33 @@ static int archivehistory(const char *current)
 	return ret;
 }
 
+static gboolean histuniquep(WebKitWebView *view, const char *str)
+{
+	WebKitBackForwardList *bfl = webkit_web_view_get_back_forward_list(view);
+	WebKitBackForwardListItem *item;
+	int i; int f = 0;
+
+	for (i = 1; (item = webkit_back_forward_list_get_nth_item(bfl, i)) != NULL; i++) {
+		f++;
+		const char *url = webkit_back_forward_list_item_get_uri(item);
+		int pos = strchrnul(str+19, ' ') - (str+19);
+		if (strncmp(str + 19, url, pos) == 0) {
+			return false;
+		}
+	}
+	if (f != 0) {
+		return false;
+	}
+	for (i = -1; (item = webkit_back_forward_list_get_nth_item(bfl, i)) != NULL; i--) {
+		const char *url = webkit_back_forward_list_item_get_uri(item);
+		int pos = strchrnul(str+19, ' ') - (str+19);
+		if (strncmp(str + 19, url, pos) == 0) {
+			return false;
+		}
+	}
+	return true;
+}
+
 static int historyenabled = 1;
 static gboolean histcb(Win *win)
 {
@@ -477,6 +504,12 @@ static gboolean histcb(Win *win)
 
 	char *str = win->histstr;
 	win->histstr = NULL;
+
+	if (!histuniquep(win->kit, str)) {
+		g_free(str);
+		return false;
+ 	}
+
 	if (lasthist && !strcmp(str + 18, lasthist + 18))
 	{
 		g_free(str);
@@ -3364,7 +3397,7 @@ static gboolean focuscb(Win *win)
 	g_ptr_array_insert(wins, 0, win);
 
 	checkconf(NULL); //to create conf
-	fixhist(win);
+//	fixhist(win); // only load events to history ;madhu 180604
 
 	return false;
 }
