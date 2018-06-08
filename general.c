@@ -109,6 +109,7 @@ typedef enum {
 	Ctext   = 't',
 	Cspawn  = 'S',
 	Crange  = 'r',
+	Cimage  = 'i',
 	Crm     = 'R',
 
 	Cmode   = 'm',
