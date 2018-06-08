@@ -900,6 +900,7 @@ static GSList *_makelist(Page *page, let doc, let win,
 	if (type == Curi  ) taglist = uritags;
 	if (type == Cspawn) taglist = uritags;
 	if (type == Crange) taglist = uritags;
+	if (type == Cimage) taglist = uritags;
 	if (type == Ctext ) taglist = texttags;
 
 	if (type == Cclick && page->script)
@@ -1038,8 +1039,7 @@ static GSList *makelist(Page *page, let doc, let win,
 static char *hinturi(Coms type, let te, char *uritype)
 {
 	char *uri = NULL;
-
-	if (type == Curi || type == Cspawn || type == Crange)
+	if (type == Curi || type == Cspawn || type == Crange || type == Cimage)
 	{
 		uri = attr(te, "SRC");
 
@@ -1063,7 +1063,7 @@ static char *hinturi(Coms type, let te, char *uritype)
 			g_object_unref(cl);
 		}
 
-		if (uri && (type == Cspawn || type == Crange))
+		if (uri && (type == Cspawn || type == Crange || type == Cimage))
 		{
 			if (!strcmp(stag(te), "IMG"))
 				*uritype = 'i';
@@ -1748,6 +1748,7 @@ static gboolean msgcb(WebKitWebPage *kp, WebKitUserMessage *msg, Page *page)
 	case Clink:
 	case Curi:
 	case Cspawn:
+	case Cimage:
 	case Crange:
 		if (arg)
 		{
