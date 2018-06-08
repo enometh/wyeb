@@ -2771,6 +2771,11 @@ static Keybind dkeys[]= {
 
 	{"tohintopen"    , 0, 0, "not click but opens uri as opennew/back"},
 
+	{"tohintimageopen", ';', GDK_CONTROL_MASK},
+	{"tohintimagenew",  ';', 0},
+	{"tohintimageback", ':', GDK_CONTROL_MASK},
+	{"tohintimagedl",   'D', GDK_CONTROL_MASK},
+
 	{"openback"      , 0, 0},
 	{"openwithref"   , 0, 0, "Current uri is sent as Referer"},
 	{"download"      , 0, 0},
@@ -3084,6 +3089,11 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	H("tohintopen"    , Clink , "open"    , NULL, NULL, Mhint)
 	H("tohintnew"     , Clink , "opennew" , NULL, NULL, Mhint)
 	H("tohintback"    , Clink , "openback", NULL, NULL, Mhint)
+	H("tohintimageopen", Cimage, "open"   , NULL, NULL, Mhint)
+	H("tohintimagenew",  Cimage , "opennew" ,  NULL, NULL, Mhint)
+	H("tohintimageback", Cimage , "openback",  NULL, NULL, Mhint)
+	H("tohintimagedl",   Cimage , "dlwithheaders",  NULL, NULL, Mhint)
+
 	H("tohintdl"      , Curi  , getsetbool(win, "dlwithheaders") ?
 			"dlwithheaders" : "download"  , NULL, NULL, Mhint)
 	H("tohintbookmark", Curi  , "bookmark", NULL, NULL, Mhint)
