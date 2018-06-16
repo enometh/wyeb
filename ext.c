@@ -1841,6 +1841,116 @@ static void headerout(const char *name, const char *value, gpointer p)
 }
 
 
+#if JSC
+void init_ephy1(Page *page) {
+	g_assert(WEBKIT_IS_FRAME(page->mf));
+	JSCContext *js_context = webkit_frame_get_js_context(page->mf);
+	g_assert(JSC_IS_CONTEXT(js_context));
+	char *data="var Ephy1 = {};"
+"Ephy1.icon_url_p = function(str)"
+"{"
+"    let links = document.getElementsByTagName('link');"
+"    for (let i = 0; i < links.length; i++) {"
+"        let link = links[i];"
+"        if (link.rel == 'icon' || link.rel == 'shortcut icon' || link.rel == 'icon shortcut' || link.rel == 'shortcut-icon' || link.rel == 'apple-touch-icon') {"
+"\n//		console.debug('link=' + link + ': href=' + link.href + ': str=' + str + ':');\n"
+"	    if (str.indexOf(link.href) != -1) {"
+"		return true;"
+"	    }"
+"	}"
+"    }"
+"    return false;"
+"};";
+	JSCValue *result1 = jsc_context_evaluate_with_source_uri(js_context, data, -1, "resource:///usr/local/wyeb/ephy1.js", 1);
+	g_assert(JSC_IS_VALUE(result1));
+	g_object_unref(result1);
+}
+
+static gboolean icon_url_p_ephy1(const char *reqstr, Page *page) {
+	JSCContext *js_context = webkit_frame_get_js_context(page->mf);
+	g_assert(JSC_IS_CONTEXT(js_context));
+	JSCValue *js_ephy = jsc_context_get_value(js_context, "Ephy1");
+	g_assert(JSC_IS_VALUE(js_ephy));
+	if(jsc_value_is_undefined(js_ephy)) {
+		//fprintf(stderr, "INITIALIZING EPHY1\n");
+		init_ephy1(page);
+		js_context = webkit_frame_get_js_context(page->mf);
+		js_ephy = jsc_context_get_value(js_context, "Ephy1");
+	}
+	g_assert(!jsc_value_is_undefined(js_ephy));
+	JSCValue *result = jsc_value_object_invoke_method(js_ephy, "icon_url_p", G_TYPE_STRING, reqstr, G_TYPE_NONE);
+	g_assert(JSC_IS_VALUE(result));
+	g_assert(jsc_value_is_boolean(result));
+	gboolean allow_favicon = jsc_value_to_boolean(result);
+	g_object_unref(result);
+	g_object_unref(js_ephy);
+	g_object_unref(js_context);
+	return allow_favicon;
+}
+
+gboolean
+icon_url_p_jsc_dom(const char *str, Page *page)
+{
+	let doc = sdoc(page);
+	let links = invoker(doc, "getElementsByTagName", aS("link"));
+	int i;
+	//let lengthv = prop(links, "length");
+	//int length = toi(lengthv); g_object_unref(lengthv);
+	let link;
+	for (i = 0; (link = idx(links, i)); i++) {
+		//let link = idx(links, i);
+		char * rel = props(link, "rel");
+		//fprintf(stderr, "rel=%s\n", rel);
+		if (rel != NULL &&
+		    (strcmp(rel, "icon") == 0 ||
+		     strcmp(rel, "shortcut icon") == 0 ||
+		     strcmp(rel, "icon shortcut") == 0 ||
+		     strcmp(rel, "apple-touch-icon") == 0)) {
+			char *image = props(link, "href");
+			//fprintf(stderr, "image=%s\n", image);
+			if (image && strstr(str, image)) {
+				g_free(image);
+				g_free(rel);
+				g_object_unref(links);
+				return true;
+			}
+			g_free(image);
+		}
+		g_free(rel);
+	}
+	g_object_unref(links);
+	return false;
+}
+#endif
+
+gboolean
+icon_url_p_dom(const char *str, Page *page)
+{
+	WebKitDOMDocument *document = webkit_web_page_get_dom_document(page->kit);
+	WebKitDOMHTMLCollection *links = webkit_dom_document_get_elements_by_tag_name_as_html_collection(document, "link");
+	int length = webkit_dom_html_collection_get_length(links);
+	int i;
+	for (i = 0; i < length; i++) {
+		WebKitDOMNode *node = webkit_dom_html_collection_item(links, i);
+		char *rel = webkit_dom_html_link_element_get_rel(WEBKIT_DOM_HTML_LINK_ELEMENT(node));
+		if (rel != NULL && (
+			    g_ascii_strcasecmp (rel, "icon") == 0 ||
+			    g_ascii_strcasecmp (rel, "shortcut icon") == 0 ||
+			    g_ascii_strcasecmp (rel, "icon shortcut") == 0 ||
+			    g_ascii_strcasecmp (rel, "shortcut-icon") == 0 ||
+			    g_ascii_strcasecmp (rel, "apple-touch-icon") == 0)) {
+			g_free(rel);
+			char *image = webkit_dom_html_link_element_get_href (WEBKIT_DOM_HTML_LINK_ELEMENT (node));
+			if (image && strstr(str, image)) {
+				g_free(image);
+				return true;
+			}
+			g_free(image);
+		}
+	}
+	return false;
+}
+
 int
 uri_scheme_http_p(const char *uri)
 {
@@ -1925,6 +2035,45 @@ static gboolean reqcb(
 		if (w3mmode_status == W3MMODE_USECONF) {
 			fprintf(stderr, "invalid conf setting for w3mmode_status: %s. Using W3MMODE_ONE\n", w3mmode);
 			w3mmode_status = W3MMODE_ONE;
+		}
+	}
+
+	if (g_key_file_get_boolean(conf, "boot", "enablefavicon", NULL)) {
+		gboolean allow_favicon, ret;
+
+#if JSC
+		gint64 start1, stop1, start2, stop2, start3, stop3;
+
+		start1 = g_get_monotonic_time();
+#endif
+		ret = icon_url_p_dom(reqstr, page);
+		allow_favicon = ret;
+#if JSC
+		stop1 = g_get_monotonic_time();
+
+		start2 = g_get_monotonic_time();
+		ret = icon_url_p_ephy1(reqstr, page);
+		stop2 = g_get_monotonic_time();
+		g_assert(ret == allow_favicon);
+
+		start3 = g_get_monotonic_time();
+		ret = icon_url_p_jsc_dom(reqstr, page);
+		stop3 = g_get_monotonic_time();
+		g_assert(ret == allow_favicon);
+
+		fprintf(stderr, "elapsed_dom1 %"G_GINT64_FORMAT
+			" = %"G_GINT64_FORMAT " - %"G_GINT64_FORMAT"\n",
+			stop1 - start1, stop1, start1);
+		fprintf(stderr, "elapsed_ephy1 %"G_GINT64_FORMAT
+			" = %"G_GINT64_FORMAT " - %"G_GINT64_FORMAT"\n",
+			stop2 - start2, stop2, start2);
+		fprintf(stderr, "elapsed_jsc1 %"G_GINT64_FORMAT
+			" = %"G_GINT64_FORMAT " - %"G_GINT64_FORMAT"\n",
+			stop3 - start3, stop3, start3);
+#endif
+		if (allow_favicon) {
+			reason = "allow favicon";
+			goto out;
 		}
 	}
 
@@ -2147,4 +2296,3 @@ G_MODULE_EXPORT void webkit_web_extension_initialize_with_user_data(
 	pages = g_ptr_array_new();
 	SIG(ex, "page-created", initpage, NULL);
 }
-
