@@ -246,6 +246,10 @@ static Cmd choices[] = {
 	{ "history-on", NULL, { .v = "on" }, "historymode" },
 	{ "history-off", NULL, { .v = "off" }, "historymode" },
 	{ "history-status", NULL, { .v = "status" }, "historymode" },
+	{ "cookies-on", NULL, { .v = "on" }, "cookiepolicy" },
+	{ "cookies-off", NULL, { .v = "off" }, "cookiepolicy" },
+	{ "cookies-status", NULL, { .v = "status" }, "cookiepolicy" },
+	{ "toggle-cookies", NULL, { .v = "cycle" }, "cookiepolicy" },
 };
 
 void surf_cmdprompt(Win *w)
