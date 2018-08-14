@@ -1388,7 +1388,8 @@ static void _openuri(Win *win, const char *str, Win *caller)
 		g_str_has_prefix(str, "file:") ||
 		g_str_has_prefix(str, "data:") ||
 		g_str_has_prefix(str, "blob:") ||
-		g_str_has_prefix(str, "about:")
+		g_str_has_prefix(str, "about:") ||
+		g_str_has_prefix(str, "inspector:")
 	) {
 		setatom(win, atomUri, URI(win));
 		webkit_web_view_load_uri(win->kit, str);
