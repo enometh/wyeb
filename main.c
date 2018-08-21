@@ -5841,8 +5841,16 @@ int main(int argc, char **argv)
 
 	if (!*action) action = "new";
 	if (uri && !*uri) uri = NULL;
-	if (argc == 2 && uri && g_file_test(uri, G_FILE_TEST_EXISTS))
-		uri = g_strconcat("file://", uri, NULL);
+	if (argc == 2 && uri && g_file_test(uri, G_FILE_TEST_EXISTS)) {
+		char *resolved_path = realpath(uri, NULL);
+		if (!resolved_path) {
+			fprintf(stderr, "accessing %s: ", uri);
+			perror("realpath");
+		} else {
+			uri = g_strconcat("file://", resolved_path, NULL);
+			g_free(resolved_path);
+		}
+	}
 
 	char *cwd = g_get_current_dir();
 	char *sendstr = g_strdup_printf("m:%zu:%zu:%s%s%s:%s:%s",
