@@ -2716,6 +2716,7 @@ static Keybind dkeys[]= {
 
 //normal
 	{"toinsert"      , 'i', 0},
+	{"toinsert"	 , GDK_KEY_BackSpace, 0},
 	{"toinsertinput" , 'I', 0, "To Insert Mode with focus of first input"},
 	{"topointer"     , 'p', 0, "pp resets damping. Esc clears pos. Press enter/space makes btn press"},
 	{"topointermdl"  , 'P', 0, "Makes middle click"},
