@@ -113,6 +113,7 @@ typedef struct _WP {
 	double  lasty;
 	char   *msg;
 	double  prog;
+	gint64  prog_start1, prog_end1;
 	double  progd;
 	GdkRectangle progrect;
 	guint   drawprogcb;
@@ -4997,6 +4998,7 @@ static void loadcb(WebKitWebView *k, WebKitLoadEvent event, Win *win)
 		//policycb? no it emits even sub frames and of course
 		//we can't get if it is sub or not.
 		win->progd = 0;
+		win->prog_start1 = g_get_monotonic_time();
 		if (!win->drawprogcb)
 			win->drawprogcb = g_timeout_add(30, (GSourceFunc)drawprogcb, win);
 		gtk_widget_queue_draw(win->canvas);
@@ -5061,6 +5063,10 @@ static void loadcb(WebKitWebView *k, WebKitLoadEvent event, Win *win)
 		surfrunscript(win);
 
 		win->progd = 1;
+		win->prog_end1 =  g_get_monotonic_time();
+		_showmsg(win, g_strdup_printf
+			 ("loaded in %"G_GINT64_FORMAT " ms",
+			  (win->prog_end1 - win->prog_start1)/1000));
 		drawprogif(win, true);
 		//start is skipped when hist forward on seme pages
 		if (win->drawprogcb)
