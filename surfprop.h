@@ -250,6 +250,10 @@ static Cmd choices[] = {
 	{ "cookies-off", NULL, { .v = "off" }, "cookiepolicy" },
 	{ "cookies-status", NULL, { .v = "status" }, "cookiepolicy" },
 	{ "toggle-cookies", NULL, { .v = "cycle" }, "cookiepolicy" },
+	{ "proxy-status", NULL, { .v = "status" }, "proxymode" },
+	{ "proxy-system", NULL, { .v = "default" }, "proxymode" },
+	{ "proxy-on", NULL, { .v = "custom" }, "proxymode" },
+	{ "proxy-off", NULL, { .v = "no_proxy" }, "proxymode" },
 };
 
 void surf_cmdprompt(Win *w)
