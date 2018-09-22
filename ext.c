@@ -436,17 +436,24 @@ static void clearwb(Wb *wb)
 	regfree(&wb->reg);
 	g_free(wb);
 }
-static GSList *wblist = NULL;
-static char   *wbpath = NULL;
-static void setwblist(bool reload)
+typedef struct {
+	GSList *wblist;
+	char   *wbpath;
+}  wbstruct;
+
+static wbstruct global_wb;
+
+static void setwblist(wbstruct * wbstruct, bool reload)
 {
-	if (wblist)
-		g_slist_free_full(wblist, (GDestroyNotify)clearwb);
-	wblist = NULL;
+	if (wbstruct == NULL) wbstruct = &global_wb;
 
-	if (!g_file_test(wbpath, G_FILE_TEST_EXISTS)) return;
+	if (wbstruct->wblist)
+		g_slist_free_full(wbstruct->wblist, (GDestroyNotify)clearwb);
+	wbstruct->wblist = NULL;
 
-	GIOChannel *io = g_io_channel_new_file(wbpath, "r", NULL);
+	if (!g_file_test(wbstruct->wbpath, G_FILE_TEST_EXISTS)) return;
+
+	GIOChannel *io = g_io_channel_new_file(wbstruct->wbpath, "r", NULL);
 	char *line;
 	while (g_io_channel_read_line(io, &line, NULL, NULL, NULL)
 			== G_IO_STATUS_NORMAL)
@@ -462,7 +469,7 @@ static void setwblist(bool reload)
 				continue;
 			}
 			wb->white = *line == 'w' ? 1 : 0;
-			wblist = g_slist_prepend(wblist, wb);
+			wbstruct->wblist = g_slist_prepend(wbstruct->wblist, wb);
 		}
 		g_free(line);
 	}
@@ -471,11 +478,12 @@ static void setwblist(bool reload)
 	if (reload)
 		send(*pages->pdata, "_reloadlast", NULL);
 }
-static int checkwb(const char *uri) // -1 no result, 0 black, 1 white;
+static int checkwb(wbstruct *wbstruct, const char *uri) // -1 no result, 0 black, 1 white;
 {
-	if (!wblist) return -1;
+	if (wbstruct == NULL) wbstruct = &global_wb;
+	if (!wbstruct->wblist) return -1;
 
-	for (GSList *next = wblist; next; next = next->next)
+	for (GSList *next = wbstruct->wblist; next; next = next->next)
 	{
 		Wb *wb = next->data;
 		if (regexec(&wb->reg, uri, 0, NULL, 0) == 0)
@@ -495,8 +503,10 @@ static void addblack(Page *page, const char *uri)
 {
 	page->black = g_slist_prepend(page->black, g_strdup(uri));
 }
-static void showwhite(Page *page, bool white)
+static void showwhite(wbstruct *wbstruct, Page *page, bool white)
 {
+	if (wbstruct == NULL) wbstruct = &global_wb;
+
 	GSList *list = white ? page->white : page->black;
 	if (!list)
 	{
@@ -504,7 +514,7 @@ static void showwhite(Page *page, bool white)
 		return;
 	}
 
-	FILE *f = fopen(wbpath, "a");
+	FILE *f = fopen(wbstruct->wbpath, "a");
 	if (!f) return;
 
 	if (white)
@@ -524,7 +534,7 @@ static void showwhite(Page *page, bool white)
 
 	fclose(f);
 
-	send(page, "openeditor", wbpath);
+	send(page, "openeditor", wbstruct->wbpath);
 }
 
 
@@ -1809,10 +1819,10 @@ void ipccb(const char *line)
 		break;
 
 	case Cwhite:
-		if (*arg == 'r') setwblist(true);
-		if (*arg == 'n') setwblist(false);
-		if (*arg == 'w') showwhite(page, true);
-		if (*arg == 'b') showwhite(page, false);
+		if (*arg == 'r') setwblist(NULL, true);
+		if (*arg == 'n') setwblist(NULL, false);
+		if (*arg == 'w') showwhite(NULL, page, true);
+		if (*arg == 'b') showwhite(NULL, page, false);
 		break;
 
 	case Ctlget:
@@ -2120,7 +2130,7 @@ static gboolean reqcb(
 		}
 	}
 
-	int check = checkwb(reqstr);
+	int check = checkwb(NULL, reqstr);
 	if (check == 0) {
 		reason = "checkwb";
 		ret = true;
@@ -2277,8 +2287,9 @@ static void initpage(WebKitWebExtension *ex, WebKitWebPage *kp)
 	page->w3mmode_status = W3MMODE_USECONF;
 	g_ptr_array_add(pages, page);
 
-	wbpath = path2conf("whiteblack.conf");
-	setwblist(false);
+	wbstruct *wbstruct = &global_wb;
+	wbstruct->wbpath = path2conf("whiteblack.conf");
+	setwblist(NULL, false);
 
 	static char *ipcid;
 	if (!ipcid)
