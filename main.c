@@ -277,6 +277,120 @@ static char *mainmdstr =
 "[![]("APP":f/"DISTROURI") "DISTRONAME"]("DISTROURI")\n"
 ;
 
+static	WebKitNetworkProxyMode proxy_mode = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
+static	WebKitNetworkProxySettings *proxy_settings = NULL;
+
+static void proxy_settings_from_conf()
+{
+	char *arg = g_strdup(confcstr("proxymode"));
+	WebKitNetworkProxyMode mode = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
+
+	if (arg)
+		if (strcmp(arg, "no_proxy") == 0)
+			mode = WEBKIT_NETWORK_PROXY_MODE_NO_PROXY;
+		else if (strcmp(arg, "default") == 0)
+			mode = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
+		else if (strcmp(arg, "custom") == 0)
+			mode = WEBKIT_NETWORK_PROXY_MODE_CUSTOM;
+		else {
+			fprintf(stderr, "checkconf: unknown proxymode: %s ( no_proxy|default|custom) using default\n",
+				arg);
+		}
+
+	char *default_proxy_uri = g_strdup(confcstr("customproxy"));
+	fprintf(stderr, "checkconf: default proxy = %s\n", default_proxy_uri);
+
+	char *ignore_hosts_str = confcstr("customproxyignorehosts");
+	char **ignore_hosts = NULL;
+	char * const *p;
+	if (ignore_hosts_str) {
+		ignore_hosts = g_strsplit(ignore_hosts_str, ",", -1);
+		for (p = ignore_hosts; *p; p++)
+			fprintf(stderr, "checkonf: customproxyignorehosts: %s\n", *p);
+	}
+
+	char *schemes[10], *proxies[10];
+	int nlines = 0;
+	char *schemeproxiesstring = confcstr("customproxiesforschemes");
+	if (schemeproxiesstring) {
+		char **scheme_proxies = g_strsplit(schemeproxiesstring, ",", -1);
+		if (scheme_proxies) {
+			for (p = scheme_proxies; *p && nlines < 10-1; p++) {
+				char **scheme_proxy_pair= g_strsplit(*p, "=", -1);
+				char **q = scheme_proxy_pair;
+				char *scheme, *proxy;
+				int valid = 0;
+				if (*q) {
+					scheme = *q;
+					q++;
+					if (*q) {
+						proxy = *q;
+						q++;
+						valid = 1;
+					}
+					if (*q) {
+						fprintf(stderr, "checkconf: customproxiesforschemes: ignoring: ");
+						do { fprintf(stderr, "%s", *q++); } while (*q);
+						fprintf(stderr, "\n");
+					}
+				}
+				if (!valid) {
+					fprintf(stderr, "checkconf: customproxyschemes: failed to parse scheme=proxy_url line:\n");
+				} else {
+					fprintf(stderr, "checkconf: customproxyschemes: adding %s: %s\n", scheme, proxy);
+					schemes[nlines] = strdup(scheme);
+					proxies[nlines] = strdup(proxy);
+					nlines++;
+				}
+				g_strfreev(scheme_proxy_pair);
+			}
+		}
+		g_strfreev(scheme_proxies);
+	}
+
+	if (proxy_settings) {
+		webkit_network_proxy_settings_free(proxy_settings);
+		proxy_settings = NULL;
+	}
+
+	// set proxy_settings from "customproxy" and "customproxyignorehosts"
+	if (default_proxy_uri) {
+		fprintf(stderr, "checkconf: creating proxy settings with default proxy = %s\n", default_proxy_uri);
+		proxy_settings = webkit_network_proxy_settings_new
+			(default_proxy_uri, (const char * const *) ignore_hosts);
+		g_strfreev(ignore_hosts);
+		int i;
+		for (i = 0; i < nlines; i++) {
+			webkit_network_proxy_settings_add_proxy_for_scheme
+				(proxy_settings, schemes[i], proxies[i]);
+			g_free(schemes[i]); g_free(proxies[i]);
+		}
+	}
+
+	if (arg && ctx)       // proxymode was supplied. we set mode from it.
+		if (mode == WEBKIT_NETWORK_PROXY_MODE_NO_PROXY ||
+		    mode == WEBKIT_NETWORK_PROXY_MODE_DEFAULT)  {
+			// we do not use proxy_settings.
+			fprintf(stderr, "setting proxymode = %s\n",
+				(mode == WEBKIT_NETWORK_PROXY_MODE_NO_PROXY) ? "None" : "System");
+			webkit_web_context_set_network_proxy_settings(ctx, mode, NULL);
+			proxy_mode = mode;
+		}
+		else if (mode == WEBKIT_NETWORK_PROXY_MODE_CUSTOM)
+			if (proxy_settings) {
+				webkit_web_context_set_network_proxy_settings
+					(ctx, mode, proxy_settings);
+				fprintf(stderr, "setting customproxy: %s\n", default_proxy_uri);
+				proxy_mode = mode;
+			} else {
+				fprintf(stderr, "checkconf: CUSTOM: but no customproxy setting. setting default\n");
+				proxy_mode = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
+				webkit_web_context_set_network_proxy_settings(ctx, proxy_mode, NULL);
+			}
+	g_free(arg);
+	g_free(default_proxy_uri);
+}
+
 //@misc
 //util (indeipendent
 static void addhash(char *str, guint *hash)
@@ -1174,6 +1288,8 @@ static void checkconf(const char *mp)
 		webkit_website_data_manager_set_itp_enabled(
 			webkit_web_context_get_website_data_manager(ctx), confbool("itp"));
 	}
+
+	if (ctx) proxy_settings_from_conf();
 
 	if (!wins) return;
 
@@ -3062,6 +3178,55 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			}
 			_showmsg(win, g_strdup_printf("historymode = %s%s\n", historyenabled ? "enabled" : "disabled", (actionp ? ((historyenabled == old) ? "(unchanged)" : "(changed)") : "")));)
 
+		Z("proxymode",
+			// cannot retrieve earlier settings from webkit.
+			WebKitNetworkProxyMode old = proxy_mode;
+			WebKitNetworkProxyMode new;
+			char *enum_name[3];
+			int statusonly = 0;
+			enum_name[WEBKIT_NETWORK_PROXY_MODE_DEFAULT] = "System";
+			enum_name[WEBKIT_NETWORK_PROXY_MODE_NO_PROXY] = "None";
+			enum_name[WEBKIT_NETWORK_PROXY_MODE_CUSTOM] = "Custom";
+			if (strcmp(arg, "no_proxy") == 0 ||
+			    strcmp(arg, "none") == 0)
+				new = WEBKIT_NETWORK_PROXY_MODE_NO_PROXY;
+			else if (strcmp(arg, "default") == 0)
+				new = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
+			else if (strcmp(arg, "custom") == 0)
+				new = WEBKIT_NETWORK_PROXY_MODE_CUSTOM;
+			else if (strcmp(arg, "status") == 0) {
+				// unreliable
+				_showmsg(win, g_strdup_printf("proxymode: last known value %d %s",
+							      proxy_mode, enum_name[proxy_mode]));
+				statusonly = 1;
+			} else {
+				fprintf(stderr, "proxymode: Unknown mode %d. using default\n", old);
+				new = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
+			}
+			if (!statusonly) {
+				if (new == WEBKIT_NETWORK_PROXY_MODE_CUSTOM && proxy_settings == NULL) {
+					showmsg(win, "proxymode: CUSTOM settings empty. Using default");
+					new = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
+				}
+				WebKitWebContext *ctx = webkit_web_view_get_context(win->kit);
+				if (old != new) {
+					if (new == WEBKIT_NETWORK_PROXY_MODE_DEFAULT ||
+					    new == WEBKIT_NETWORK_PROXY_MODE_NO_PROXY)
+						webkit_web_context_set_network_proxy_settings(ctx, new, NULL);
+					else
+						// use last known global settings
+						webkit_web_context_set_network_proxy_settings
+							(ctx, new, proxy_settings);
+					proxy_mode = new;
+				}
+				char *msg = g_strdup_printf("proxymode = %s", enum_name[new]);
+				if (old == new) {
+					GFA(msg, g_strdup_printf("%s (unchanged)", msg));
+				} else {
+					GFA(msg, g_strdup_printf("%s (was %s)", msg, enum_name[old]));
+				}
+				_showmsg(win, msg);
+					})
 	}
 
 	Z("tonormal"    , win->mode = Mnormal)
@@ -5538,6 +5703,8 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 		g_free(cache);
 
 		ctx = webkit_web_context_new_with_website_data_manager(mgr);
+
+		proxy_settings_from_conf(); //on creation
 
 		//cookie  //have to be after ctx are made
 		WebKitCookieManager *cookiemgr =
