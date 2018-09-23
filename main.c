@@ -2952,6 +2952,7 @@ static Keybind dkeys[]= {
 			"\n  The stdout is not caller's but first process's stdout."},
 #endif
 	{"surfcharset"	 , 0, 0, "Reload with charset"},
+	{"revealhint"    , GDK_KEY_F2, 0, "Reveal hint"},
 
 //todo pagelist
 //	{"windowimage"   , 0, 0}, //pageid
@@ -2991,6 +2992,67 @@ static char *ke2name(Win *win, GdkEventKey *ke)
 	}
 	return NULL;
 }
+
+char*
+parse_hintdata_at(Win *win, int x, int y)
+{
+	char *ret = 0;
+	if (win->hintdata) {
+		PangoFontDescription *desc = pango_font_description_copy(
+			pango_context_get_font_description(
+				gtk_widget_get_pango_context(win->winw)));
+		pango_font_description_set_family(desc, "monospace");
+		pango_font_description_set_weight(desc, PANGO_WEIGHT_BOLD);
+
+		double z = webkit_web_view_get_zoom_level(win->kit);
+		char **hints = g_strsplit(win->hintdata, ";", -1);
+		for (char **lh = hints; *lh && **lh; lh++) {
+			char *h = *lh;
+			//0   123*   141*   190*   164*  0*FF //example
+			//0123456789012345678901234567890123456789
+			//0---------1---------2---------3---------
+			h[7]=h[14]=h[21]=h[28]=h[32] = '\0';
+#define Z(i) atoi(h + i) * z
+			int bx = Z(1), by=Z(8), bw=Z(15), bh=Z(22);
+#undef Z
+			char *txt = h+34;
+			int len = atoi(h+29);
+			bool head = h[33] = '1';
+			int center = *h == '1';
+
+			PangoLayout *layout = gtk_widget_create_pango_layout(win->winw, txt);
+			pango_layout_set_font_description(layout, desc);
+			PangoRectangle inkrect, logicrect;
+			pango_layout_get_pixel_extents(layout, &inkrect, &logicrect);
+			int m = 2;
+
+			int pw = logicrect.width + m*2;
+			int ph = inkrect.height + m*2;
+			int px = (bx + bx + bw - pw ) / 2;
+			int py = MAX(-m, by + (center ? ph/2 : -ph/2 - 1));
+
+			/*
+			fprintf(stderr, "in (x,y,r,b) b(%d %d %d %d) p(%d %d %d %d): txt=%s: cen=%d head=%d len=%d\n",
+				bx, by, bx + bw, by + bh,
+				px, py, px + pw, py + ph,
+				txt, center, head,len
+				);
+			*/
+			if ((x >= bx) && (y >= by) && (x <= (bx + bw)) &&
+			    (y <= (by + bh))) {
+				ret = txt;
+			}
+			if ((x >= px) && (y >= py) && (x <= (px + pw)) &&
+			    (y <= (py + ph))) {
+				ret = txt; //break
+			}
+		}
+		g_strfreev(hints);
+		pango_font_description_free(desc);
+	}
+	return ret;
+}
+
 //declaration
 static Win *newwin(const char *uri, Win *cbwin, Win *caller, int back);
 static bool _run(Win *win, const char* action, const char *arg, char *cdir, char *exarg)
@@ -3529,6 +3591,13 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 
 	Z("viewsource", viewsourceorheaders(win, VSH_SOURCE))
 	Z("viewheaders", viewsourceorheaders(win, VSH_HEADERS))
+
+	Z("revealhint",
+	  int x; int y; char *txt;
+	  gdk_window_get_device_position(gdkw(win->kitw), pointer(), &x, &y, NULL);
+	  txt = parse_hintdata_at(win, x, y);
+//	  fprintf(stderr, "pointer position: %d,%d hinttext=%s\n", x, y, txt ?: "<unknown>");
+	  if (txt) send(win, Creveal, txt))
 
 	Z("textlink", textlinktry(win));
 	Z("raise"   , present(arg ? winbyid(arg) ?: win : win))
