@@ -1120,10 +1120,13 @@ static void hintret(Page *page, Coms type, let te, bool hasnext)
 	g_free(retstr);
 }
 
+static gboolean revealfu = false;
+
 static bool makehint(Page *page, Coms type, char *hintkeys, char *ipkeys)
 {
 	let doc = sdoc(page);
-	page->lasttype = type;
+
+	if (!revealfu) page->lasttype = type;
 
 	if (type != Cclick)
 	{
@@ -1155,6 +1158,7 @@ static bool makehint(Page *page, Coms type, char *hintkeys, char *ipkeys)
 #endif
 	}
 
+	if (!revealfu)
 	if (hintkeys)
 	{
 		g_free(page->lasthintkeys);
@@ -1164,7 +1168,7 @@ static bool makehint(Page *page, Coms type, char *hintkeys, char *ipkeys)
 		hintkeys = page->lasthintkeys;
 	if (strlen(hintkeys ?: "") < 3) hintkeys = HINTKEYS;
 
-	GFA(page->apkeys, ipkeys)
+	if (!revealfu) GFA(page->apkeys, ipkeys)
 
 	let win = defaultview(doc);
 #if JSC
@@ -1221,6 +1225,7 @@ static bool makehint(Page *page, Coms type, char *hintkeys, char *ipkeys)
 			continue;
 		}
 
+		if (!revealfu)
 		if (!strcmp(key, ipkeys))
 		{
 			ipkeys = NULL;
@@ -1265,7 +1270,7 @@ static bool makehint(Page *page, Coms type, char *hintkeys, char *ipkeys)
 			{
 				ret = true;
 				focuselm(te);
-				if (type == Cclick)
+				if (type == Cclick && ! revealfu)
 				{
 					bool isi = isinput(te);
 					if (page->script && !isi)
@@ -1320,8 +1325,16 @@ static bool makehint(Page *page, Coms type, char *hintkeys, char *ipkeys)
 				}
 				else
 				{
-					hintret(page, type, te, false);
-					send(page, "tonormal", NULL);
+					if (revealfu) {
+						char *uri =
+							attr(elm->elm, "ONCLICK") ?:
+							attr(elm->elm, "HREF") ?:
+							attr(elm->elm, "SRC");
+						send(page, "showmsg", uri);
+					} else {
+						hintret(page, type, te, false);
+						send(page, "tonormal", NULL);
+					}
 				}
 			}
 		}
@@ -1346,6 +1359,7 @@ static bool makehint(Page *page, Coms type, char *hintkeys, char *ipkeys)
 			rangein = --rangeleft > 0 && rangeend != te;
 	}
 
+	if (!revealfu)
 	send(page, "_hintdata", hintstr->str);
 	g_string_free(hintstr, true);
 
@@ -1714,6 +1728,9 @@ static gboolean msgcb(WebKitWebPage *kp, WebKitUserMessage *msg, Page *page)
 	fprintf(stderr, "ext msgcb: args[0]=%s arg[1]=%s (type) args[2]=%s (arg)\n",
 		args[0], args[1], args[2]);
 
+//	fprintf(stderr, "ipccb: set revealfu %d=>false page->lasttype=%c hint=%d apkeys=%s lasthintkeys=%s rangestart=%s\n", revealfu, page->lasttype, page->hint, page->apkeys, page->lasthintkeys, page->rangestart);
+	revealfu = false;
+
 	Coms type = *args[1];
 	char *arg = args[2];
 
@@ -1738,6 +1755,10 @@ static gboolean msgcb(WebKitWebPage *kp, WebKitUserMessage *msg, Page *page)
 		pageon(page, *arg == 'f');
 		break;
 
+	case Creveal:
+		revealfu = true;
+		ipkeys = strdup(arg);
+
 	case Ckey:
 	{
 		if (page->hintcb)
@@ -1745,11 +1766,13 @@ static gboolean msgcb(WebKitWebPage *kp, WebKitUserMessage *msg, Page *page)
 			g_source_remove(page->hintcb);
 			page->hintcb = g_timeout_add(400, (GSourceFunc)_hintcb, page);
 		}
-
+		if (!revealfu)
+		{
 		char key[2] = {0};
 		key[0] = toupper(arg[0]);
 		ipkeys = page->apkeys ?
 			g_strconcat(page->apkeys, key, NULL) : g_strdup(key);
+		}
 
 		type = page->lasttype;
 		arg = NULL;
@@ -1770,7 +1793,7 @@ static gboolean msgcb(WebKitWebPage *kp, WebKitUserMessage *msg, Page *page)
 		if (!(page->hint = makehint(page, type, getset(page, "hintkeys"), ipkeys)))
 		{
 			send(page, "showmsg", "No hint");
-			send(page, "tonormal", NULL);
+			if (!revealfu) send(page, "tonormal", NULL);
 		}
 //D(time %f, (g_get_monotonic_time() - start) / 1000000.0)
 		break;

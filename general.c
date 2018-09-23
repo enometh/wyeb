@@ -95,6 +95,8 @@ typedef enum {
 	Cimage  = 'i',
 	Crm     = 'R',
 
+	Creveal = 'z',
+
 	Cmode   = 'm',
 	Cfocus  = 'f',
 	Cblur   = 'b',
