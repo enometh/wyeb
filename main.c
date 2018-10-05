@@ -1530,6 +1530,58 @@ static int formaturi(char **uri, char *key, const char *arg, char *spare)
 	g_free(format);
 	return checklen;
 }
+
+// when file:///tmp/foo%20bar refers to a file "/tmp/foo%20bar",
+// webkit_web_view_load_uri tries to load "/tmp/foo bar" which fails.
+// resolved_path is expected to be a malloc'ed string with prefix
+// "file://". It may be freed and a new string may be
+// malloc'ed. Returns the new string if escpaed..
+static char *percent_escape_percent_file_url(char *resolved_path)
+{
+    GFile *gfile = g_file_new_for_commandline_arg(resolved_path);
+    gchar *fileURL = g_file_get_uri(gfile);
+    g_object_unref(gfile);
+    g_free(resolved_path);
+    return fileURL;
+
+
+  GError *err = NULL;
+  char *ret = g_filename_to_uri(resolved_path, NULL, &err);
+  if (err)  {
+    fprintf_gerror(stderr, err, "g_filename_to_uri(%s) failed\n", resolved_path);
+    return resolved_path;
+  }
+  fprintf(stderr, "resolved %s =>\n%s\n", resolved_path, ret);
+  g_free(resolved_path);
+  return ret;
+
+	if (resolved_path && g_strrstr(resolved_path, "%")) {
+		while (1) {
+			static GRegex *percent;
+			GError *err;
+			if (percent == NULL) {
+				err = NULL;
+				percent = g_regex_new("%", 0, 0, &err);
+				if (percent == NULL) {
+					fprintf_gerror(stderr, err, "g_regex_new failed\n");
+					break;
+				}
+			}
+			err = NULL;
+			char *tmp= g_regex_replace_literal(percent, resolved_path, -1, 0, "%25", 0, &err);
+			if (err) {
+				fprintf_gerror(stderr, err, "failed to perform regexp replace\n");
+				break;
+			}
+			g_free(resolved_path);
+			resolved_path = tmp;
+			break;
+		}
+	}
+	return resolved_path;
+}
+
+
 static void _openuri(Win *win, const char *str, Win *caller)
 {
 	win->userreq = true;
@@ -1539,7 +1591,7 @@ static void _openuri(Win *win, const char *str, Win *caller)
 		g_str_has_prefix(str, "http:") ||
 		g_str_has_prefix(str, "https:") ||
 		g_str_has_prefix(str, APP":") ||
-		g_str_has_prefix(str, "file:") ||
+//		g_str_has_prefix(str, "file:") ||
 		g_str_has_prefix(str, "data:") ||
 		g_str_has_prefix(str, "blob:") ||
 		g_str_has_prefix(str, "about:") ||
@@ -1569,8 +1621,15 @@ static void _openuri(Win *win, const char *str, Win *caller)
 		goto out;
 	}
 
+	if (g_str_has_prefix(str, "file://")) {
+		uri = g_strdup(str);
+		uri = percent_escape_percent_file_url(uri);
+		goto out;
+	}
+
 	if (g_str_has_prefix(str, "/")) {
 		uri = g_strconcat("file://", str, NULL);
+		uri = percent_escape_percent_file_url(uri);
 		goto out;
 	}
 
@@ -3043,8 +3102,8 @@ parse_hintdata_at(Win *win, int x, int y)
 			int bx = Z(1), by=Z(8), bw=Z(15), bh=Z(22);
 #undef Z
 			char *txt = h+34;
-			int len = atoi(h+29);
-			bool head = h[33] = '1';
+//			int len = atoi(h+29);
+//			bool head = h[33] == '1';
 			int center = *h == '1';
 
 			PangoLayout *layout = gtk_widget_create_pango_layout(win->winw, txt);
@@ -6155,8 +6214,15 @@ int main(int argc, char **argv)
 			fprintf(stderr, "accessing %s: ", uri);
 			perror("realpath");
 		} else {
-			uri = g_strconcat("file://", resolved_path, NULL);
-			g_free(resolved_path);
+			GError *err = NULL;
+			char *ret = g_filename_to_uri(resolved_path, NULL, &err);
+			if (err)  {
+				fprintf_gerror(stderr, err, "g_filename_to_uri(%s) failed\n", resolved_path);
+				uri = resolved_path;
+			} else {
+				uri = ret;
+				g_free(resolved_path);
+			}
 		}
 	}
 
