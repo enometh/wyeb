@@ -3299,6 +3299,9 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			if (strcmp(arg, "on") == 0) {
 				actionp = 1;
 				webkit_web_context_set_cache_model(ctx, WEBKIT_CACHE_MODEL_WEB_BROWSER);
+			} else if (strcmp(arg, "mem") == 0) {
+				actionp = 1;
+				webkit_web_context_set_cache_model(ctx, WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER);
 			} else if (strcmp(arg, "off") == 0) {
 				actionp = 1;
 				webkit_web_context_set_cache_model(ctx, WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER);
@@ -3309,12 +3312,12 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			char *name = "UNKNOWN";
 			WebKitCacheModel model = webkit_web_context_get_cache_model(ctx);
 			if (model == WEBKIT_CACHE_MODEL_WEB_BROWSER)
-				name = "BROWSER";
+				name = "WEB BROWSER (ON)";
 			else if (model == WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER)
-				name = "VIEWER (OFF)";
+				name = "DOCUMENT VIEWER (OFF)";
 			else if (model == WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER)
-				name = "DOCUMENT BROWSER";
-			_showmsg(win, g_strdup_printf("cachemodel = CACHE MODEL %s%s\n", name, (actionp ? ((model == old) ? "(unchanged)" : "(changed)") : ""))))
+				name = "DOCUMENT BROWSER (MEM)";
+			_showmsg(win, g_strdup_printf("cachemodel = CACHE MODEL %s%s\n", name, (actionp ? ((model == old) ? " (unchanged)" : "(changed)") : ""))))
 
 		Z("historymode",
 			int actionp = 0;
