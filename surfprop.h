@@ -242,6 +242,7 @@ static Cmd choices[] = {
 	{ "add_security_exception", cmd_add_security_exception, { 0 } },
 	{ "cache-on", NULL, { .v = "on" }, "cachemodel" },
 	{ "cache-off", NULL, { .v = "off" }, "cachemodel" },
+	{ "cache-mem", NULL, { .v = "mem" }, "cachemodel" },
 	{ "cache-status", NULL, { .v = "status" }, "cachemodel" },
 	{ "history-on", NULL, { .v = "on" }, "historymode" },
 	{ "history-off", NULL, { .v = "off" }, "historymode" },
