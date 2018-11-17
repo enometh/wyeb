@@ -2965,6 +2965,8 @@ static Keybind dkeys[]= {
 
 	{"surfcmdprompt",  'x', GDK_MOD1_MASK },
 	{"surfgo"	 , 'g', GDK_CONTROL_MASK},
+	{"surfgo"        , GDK_KEY_F5, },
+
 	{"surffind"	 , '/', GDK_CONTROL_MASK},
 	{"savemhtml"	 , 'S', GDK_CONTROL_MASK},
 	{"savesource"	 , 'd', GDK_CONTROL_MASK},
