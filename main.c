@@ -24,6 +24,8 @@ along with wyeb.  If not, see <http://www.gnu.org/licenses/>.
 #include <gdk/gdkx.h>
 #endif
 
+#include <gcr/gcr.h>
+
 //flock
 #include <sys/file.h>
 
@@ -2980,6 +2982,7 @@ static Keybind dkeys[]= {
 			"\n  The stdout is not caller's but first process's stdout."},
 	{"surfcharset"	 , 0, 0, "Reload with charset"},
 	{"revealhint"    , GDK_KEY_F2, 0, "Reveal hint"},
+	{"showcert"	 , 'X', GDK_CONTROL_MASK, "Show tls certificate" },
 
 //todo pagelist
 //	{"windowimage"   , 0, 0}, //winid
@@ -3631,6 +3634,25 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	  txt = parse_hintdata_at(win, x, y);
 //	  fprintf(stderr, "pointer position: %d,%d hinttext=%s\n", x, y, txt ?: "<unknown>");
 	  if (txt) send(win, Creveal, txt))
+
+	Z("showcert",
+	  GTlsCertificate *cert = win->failedcert ? win->failedcert : win->cert;
+	  GcrCertificate *gcrt;
+	  GByteArray *crt;
+	  GtkWidget *widget;
+	  GcrCertificateWidget *wcert;
+	  if (cert) {
+	    g_object_get(cert, "certificate", &crt, NULL);
+	    gcrt = gcr_simple_certificate_new(crt->data, crt->len);
+	    g_byte_array_unref(crt);
+
+	    widget = gtk_window_new(GTK_WINDOW_TOPLEVEL);
+	    wcert = gcr_certificate_widget_new(gcrt);
+	    g_object_unref(gcrt);
+
+	    gtk_container_add(GTK_CONTAINER(widget), GTK_WIDGET(wcert));
+	    gtk_widget_show_all(widget);
+	  })
 
 	Z("textlink", textlinktry(win));
 	Z("raise"   , present(arg ? winbyid(arg) ?: win : win))
