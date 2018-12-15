@@ -255,6 +255,7 @@ static Cmd choices[] = {
 	{ "proxy-system", NULL, { .v = "default" }, "proxymode" },
 	{ "proxy-on", NULL, { .v = "custom" }, "proxymode" },
 	{ "proxy-off", NULL, { .v = "no_proxy" }, "proxymode" },
+	{ "showcert", NULL, { 0 }, "showcert" },
 };
 
 void surf_cmdprompt(Win *w)
