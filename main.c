@@ -4366,6 +4366,7 @@ static void schemecb(WebKitURISchemeRequest *req, gpointer p)
 	GInputStream *st = g_memory_input_stream_new_from_data(data, len, g_free);
 	webkit_uri_scheme_request_finish(req, st, len, type);
 	g_object_unref(st);
+	gtk_window_set_icon(win->win, NULL);
 }
 
 
