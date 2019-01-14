@@ -4100,11 +4100,11 @@ static char *histdata(bool rest, bool all)
 		"<style>\n"
 		"* {border-radius:.4em;}\n"
 		"p {margin:.4em 0; white-space:nowrap;}\n"
-		"a, a > * {display:inline-block; vertical-align:middle;}"
-		"a {padding:.2em; color:inherit; text-decoration:none;}\n"
-		"a:hover {background-color:#faf6ff}\n"
+		"p > * {display:inline-block; vertical-align:middle;}"
+		"p {padding:.2em; color:inherit; text-decoration:none;}\n"
+		"p:hover {background-color:#faf6ff}\n"
 		"time {font-family:monospace;}\n"
-		"a > span {padding:0 .4em 0 .6em; white-space:normal; word-wrap:break-word;}\n"
+		"p > span {padding:0 .4em 0 .6em; white-space:normal; word-wrap:break-word;}\n"
 		"i {font-size:.79em; color:#43a;}\n"
 		//for img
 		"em {min-width:%dpx; text-align:center;}\n"
@@ -4152,17 +4152,17 @@ static char *histdata(bool rest, bool all)
 					((Img *)il->data)->id);
 
 			g_string_append_printf(ret,
-					"<p><a href=%s><em>%s</em>"
-					"<span>%s<br><i>%s</i><br><time>%.11s</time></span></a>\n",
-					stra[1], itag ?: "-", escpd, FORDISP(stra[1]), stra[0]);
+					"<p><em>%s</em>"
+					"<span>%s<br><a href=%s><i>%s</i></a><br><time>%.11s</time></span>\n",
+					itag ?: "-", escpd, stra[1], FORDISP(stra[1]), stra[0]);
 
 			g_free(itag);
 			il = il->next;
 		} else
 			g_string_append_printf(ret,
-					"<p><a href=%s><time>%.11s</time>"
-					"<span>%s<br><i>%s</i></span></a>\n",
-					stra[1], stra[0], escpd, FORDISP(stra[1]));
+					"<p><time>%.11s</time>"
+					"<span>%s<br><a href=%s><i>%s</i></a></span>\n",
+					stra[0], escpd, stra[1], FORDISP(stra[1]));
 
 		g_free(escpd);
 	}
