@@ -3018,6 +3018,8 @@ static Keybind dkeys[]= {
 	{"revealhint"    , GDK_KEY_F2, 0, "Reveal hint"},
 	{"showcert"	 , 'X', GDK_CONTROL_MASK, "Show tls certificate" },
 
+	{"applystyle"    , 0, 0, "Apply a css stylesheet"},
+
 //todo pagelist
 //	{"windowimage"   , 0, 0}, //pageid
 //	{"windowlist"    , 0, 0}, //=>pageid uri title
@@ -3273,6 +3275,29 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			webkit_cookie_manager_get_accept_policy(mgr, NULL, togglecookiepolicycb, &cbdata))
 		Z("customcharset", webkit_web_view_set_custom_charset(
 			win->kit, (strcmp(arg, "") == 0) ? NULL : arg))
+
+		Z("applystyle",
+		  _showmsg(win, g_strdup_printf("applystyle %s", arg));
+		  const char *name = arg;
+		  WebKitUserContentManager *cmgr =
+		  webkit_web_view_get_user_content_manager(win->kit);
+		  if (name == NULL || strcmp(name, "") == 0 || strcmp(name, "none") == 0) {
+			  webkit_user_content_manager_remove_all_style_sheets(cmgr);
+		  } else {
+			  char *path = path2conf(name);
+			  char *str;
+			  if (g_file_test(path, G_FILE_TEST_EXISTS)
+			      && g_file_get_contents(path, &str, NULL, NULL)) {
+				  WebKitUserStyleSheet *css =
+					  webkit_user_style_sheet_new(str,
+								      WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES,
+								      WEBKIT_USER_STYLE_LEVEL_USER,
+								      NULL, NULL);
+				  webkit_user_content_manager_add_style_sheet(cmgr, css);
+				  g_free(str);
+			  }
+			  g_free(path);
+		  })
 
 		Z("w3mmode_status",
 			_showmsg(win, g_strdup_printf("w3mmode is %s", arg)))
@@ -3618,6 +3643,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	Z("surffind", SETPROP("_SURF_FIND", "find", "Find:"))
 	Z("surfgo", SETPROP("_SURF_URI", "open", "Go:"))
 	Z("surfcharset", SETPROP("_SURF_CHARSET", "customcharset", "Charset:"))
+	Z("surfapplystyle", SETPROP("_SURF_STYLE", "applystyle", "Stylesheet:"))
 
 	Z("cookiepolicy",
 	  WebKitCookieManager *mgr = webkit_web_context_get_cookie_manager(webkit_web_view_get_context(win->kit));

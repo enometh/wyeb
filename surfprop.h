@@ -8,6 +8,7 @@ static Atom atomGo =  0;
 static Atom atomFind =  0;
 static Atom atomUri = 0;
 static Atom atomCharset = 0;
+static Atom atomStyle = 0;
 
 static void
 setatom(Win *win, int a, const char *v)
@@ -25,10 +26,12 @@ initatoms(Win *win)
 	if (!atomFind) atomFind = XInternAtom(win->dpy, "_SURF_FIND", False);
 	if (!atomUri) atomUri = XInternAtom(win->dpy, "_SURF_URI", False);
 	if (!atomCharset) atomCharset = XInternAtom(win->dpy, "_SURF_CHARSET", False);
+	if (!atomStyle) atomStyle = XInternAtom(win->dpy, "_SURF_STYLE", False);
 	setatom(win, atomGo, "");
 	setatom(win, atomFind, "");
 	setatom(win, atomUri, "about:blank");
 	setatom(win, atomCharset, "");
+	setatom(win, atomStyle, "");
 }
 
 static const char *
@@ -102,6 +105,13 @@ processx(GdkXEvent *e, GdkEvent *event, gpointer user_data)
 				const char * s = getatom(win, atomCharset);
 				if (s && *s) {
 					run(win, "customcharset", s);
+					return GDK_FILTER_REMOVE;
+				}
+			}
+			if (ev->atom == atomStyle) {
+				const char * s = getatom(win, atomStyle);
+				if (s && *s) {
+					run(win, "applystyle", s);
 					return GDK_FILTER_REMOVE;
 				}
 			}
@@ -256,6 +266,8 @@ static Cmd choices[] = {
 	{ "proxy-on", NULL, { .v = "custom" }, "proxymode" },
 	{ "proxy-off", NULL, { .v = "no_proxy" }, "proxymode" },
 	{ "showcert", NULL, { 0 }, "showcert" },
+
+	{ "apply-style", NULL, { 0 }, "surfapplystyle" },
 };
 
 void surf_cmdprompt(Win *w)
