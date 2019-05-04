@@ -2112,12 +2112,17 @@ static gboolean reqcb(
 		start2 = g_get_monotonic_time();
 		ret = icon_url_p_ephy1(reqstr, page);
 		stop2 = g_get_monotonic_time();
-		g_assert(ret == allow_favicon);
+//		g_assert(ret == allow_favicon);
+		if (! (ret == allow_favicon))
+			fprintf(stderr, "ASSERT FAIL FAIL FAIL Ephy: icon_url_p_dom allow_favicon=%d but icon_url_p_ephy1=%d\n", allow_favicon, ret);
 
 		start3 = g_get_monotonic_time();
 		ret = icon_url_p_jsc_dom(reqstr, page);
 		stop3 = g_get_monotonic_time();
-		g_assert(ret == allow_favicon);
+//		g_assert(ret == allow_favicon);
+		if (! (ret == allow_favicon))
+			fprintf(stderr, "ASSERT FAIL FAIL FAIL JSCDOM: icon_url_p_dom allow_favicon=%d but icon_url_p_jsc_dom=%d\n", allow_favicon, ret);
+
 
 		fprintf(stderr, "elapsed_dom1 %"G_GINT64_FORMAT
 			" = %"G_GINT64_FORMAT " - %"G_GINT64_FORMAT"\n",
