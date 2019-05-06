@@ -1909,7 +1909,7 @@ void init_ephy1(Page *page) {
 "    for (let i = 0; i < links.length; i++) {"
 "        let link = links[i];"
 "        if (link.rel == 'icon' || link.rel == 'shortcut icon' || link.rel == 'icon shortcut' || link.rel == 'shortcut-icon' || link.rel == 'apple-touch-icon') {"
-"\n//		console.debug('link=' + link + ': href=' + link.href + ': str=' + str + ':');\n"
+"\n		console.debug('link=' + link + ': href=' + link.href + ': str=' + str + ':');\n"
 "	    if (str.indexOf(link.href) != -1) {"
 "		return true;"
 "	    }"
@@ -1927,11 +1927,23 @@ static gboolean icon_url_p_ephy1(const char *reqstr, Page *page) {
 	g_assert(JSC_IS_CONTEXT(js_context));
 	JSCValue *js_ephy = jsc_context_get_value(js_context, "Ephy1");
 	g_assert(JSC_IS_VALUE(js_ephy));
+
+/*;madhu 190506
+resource:///usr/local/wyeb/ephy1.js:1:21: JS ERROR TypeError: undefined is not an object (evaluating 'Ephy1')
+**
+ERROR:../ext.c:1981:icon_url_p_ephy1: assertion failed: (!jsc_value_is_undefined(js_ephy))
+
+*/
+
 	if(jsc_value_is_undefined(js_ephy)) {
-		//fprintf(stderr, "INITIALIZING EPHY1\n");
+		fprintf(stderr, "INITIALIZING EPHY1\n");
 		init_ephy1(page);
 		js_context = webkit_frame_get_js_context(page->mf);
 		js_ephy = jsc_context_get_value(js_context, "Ephy1");
+	}
+	if (jsc_value_is_undefined(js_ephy)) {
+	  fprintf(stderr, "FAIL FAIL FAIL: icon_url_p_ephy1(%s)\n", reqstr);
+	  return false;
 	}
 	g_assert(!jsc_value_is_undefined(js_ephy));
 	JSCValue *result = jsc_value_object_invoke_method(js_ephy, "icon_url_p", G_TYPE_STRING, reqstr, G_TYPE_NONE);
