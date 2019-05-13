@@ -268,6 +268,10 @@ static Cmd choices[] = {
 	{ "showcert", NULL, { 0 }, "showcert" },
 
 	{ "apply-style", NULL, { 0 }, "surfapplystyle" },
+
+#if JAVASCRIPT_MARKUP_SHENNANIGANS
+	{ "toggle-noscript", cmd_send_set3, { .v = "noscript" } },
+#endif
 };
 
 void surf_cmdprompt(Win *w)
