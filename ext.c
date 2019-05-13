@@ -1898,9 +1898,10 @@ static void headerout(const char *name, const char *value, gpointer p)
 }
 
 #if JSC
-void init_ephy1(Page *page) {
-	g_assert(WEBKIT_IS_FRAME(page->mf));
-	JSCContext *js_context = webkit_frame_get_js_context(page->mf);
+void init_ephy0(WebKitFrame *mf)
+{
+	g_assert(WEBKIT_IS_FRAME(mf));
+	JSCContext *js_context = webkit_frame_get_js_context(mf);
 	g_assert(JSC_IS_CONTEXT(js_context));
 	char *data="var Ephy1 = {};"
 "Ephy1.icon_url_p = function(str)"
@@ -1920,6 +1921,10 @@ void init_ephy1(Page *page) {
 	JSCValue *result1 = jsc_context_evaluate_with_source_uri(js_context, data, -1, "resource:///usr/local/wyeb/ephy1.js", 1);
 	g_assert(JSC_IS_VALUE(result1));
 	g_object_unref(result1);
+}
+
+void init_ephy1(Page *page) {
+	init_ephy0(page->mf);
 }
 
 static gboolean icon_url_p_ephy1(const char *reqstr, Page *page) {
@@ -2356,7 +2361,10 @@ static void initpage(WebKitWebExtension *ex, WebKitWebPage *kp)
 //	SIG( page->kit, "document-loaded"         , loadcb   , page);
 	SIGW(page->kit, "notify::uri"             , uricb    , page);
 //	SIG( page->kit, "form-controls-associated", formcb   , NULL);
+
+
 }
+
 G_MODULE_EXPORT void webkit_web_extension_initialize_with_user_data(
 		WebKitWebExtension *ex, const GVariant *v)
 {
@@ -2364,4 +2372,22 @@ G_MODULE_EXPORT void webkit_web_extension_initialize_with_user_data(
 	fullname = g_strdup(g_strrstr(str, ";") + 1);
 	pages = g_ptr_array_new();
 	SIG(ex, "page-created", initpage, NULL);
+
+#if JSC
+	void window_object_cleared_cb(WebKitScriptWorld *world, WebKitWebPage *page, WebKitFrame *frame, WebKitWebExtension *extension);
+	WebKitScriptWorld *script_world = webkit_script_world_new_with_name ("wyebguid");
+	SIG(script_world, "window-object-cleared", window_object_cleared_cb, ex);
+#endif
 }
+
+#if JSC
+void
+window_object_cleared_cb(WebKitScriptWorld *world, WebKitWebPage *page, WebKitFrame *frame, WebKitWebExtension *extension)
+{
+	JSCContext *js_context = webkit_frame_get_js_context_for_script_world(frame, world);
+	WebKitFrame *frame1 = webkit_web_page_get_main_frame(page);
+	fprintf(stderr, "ext: window_object_cleared_cb: frame_for_script_world = %p frame = %p \n", frame, frame1);
+	fprintf(stderr, "INITIALIZING EPHY1 in window-object-cleared\n");
+	init_ephy0(frame1);
+}
+#endif
