@@ -24,6 +24,18 @@ along with wyeb.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib/gstdio.h>
 #include <regex.h>
 
+/*
+ * enable-javascript-markup is exposed in 2.24.0. enable-javascript is
+ * required for JSC and should always be true. If using 2.24.0+
+ * user-level toggling of javascript only affects
+ * enable-javascript-markup.
+ */
+#if WEBKIT_CHECK_VERSION(2,24,0)
+#define JAVASCRIPT_MARKUP_SHENNANIGANS 1
+#else
+#define JAVASCRIPT_MARKUP_SHENNANIGANS 0
+#endif
+
 #define OLDNAME  "wyebrowser"
 #define DIRNAME  "wyeb."
 #define APP      "wyeb"
@@ -178,7 +190,13 @@ static Conf dconf[] = {
 
 	{"set:v"     , "enable-caret-browsing", "true"},
 	{"set:v"     , "hackedhint4js"        , "false"},
+#if  JAVASCRIPT_MARKUP_SHENNANIGANS
+	{"set:script", "enable-javascript-markup" , "true"},
 	{"set:script", "enable-javascript"    , "true"},
+	{"set:noscript", "enable-javascript"  , "false"},
+#else
+	{"set:script", "enable-javascript"    , "true"},
+#endif
 	{"set:rel",    "reldomaindataonly"    , "false"},
 	{"set:image" , "auto-load-images"     , "true"},
 	{"set:image" , "linkformat"   , "[![]("APP":F) %.40s ](%s)"},
@@ -518,7 +536,12 @@ static void initconf(GKeyFile *kf)
 
 	const char *sample = "uri:^https?://(www\\.)?foo\\.bar/.*";
 
+#if JAVASCRIPT_MARKUP_SHENNANIGANS
+	g_key_file_set_boolean(conf, sample, "enable-javascript", true);
+	g_key_file_set_boolean(conf, sample, "enable-javascript-markup", false);
+#else
 	g_key_file_set_boolean(conf, sample, "enable-javascript", false);
+#endif
 	g_key_file_set_comment(conf, sample, NULL,
 			"After 'uri:' is regular expressions for the setting set.\n"
 			"preferential order of groups: lower > upper > '"DSET"'"

@@ -5301,11 +5301,19 @@ eval_javascript(Win *win, const char *script)
 {
 	WebKitSettings *s = webkit_web_view_get_settings(win->kit);
 	gboolean orig = webkit_settings_get_enable_javascript(s);
+#if JAVASCRIPT_MARKUP_SHENNANIGANS
+	gboolean orig_markup = webkit_settings_get_enable_javascript_markup(s);
+#endif
 	if (!orig)
 		webkit_settings_set_enable_javascript(s, TRUE);
+		webkit_settings_set_enable_javascript_markup(s, FALSE);
 	webkit_web_view_run_javascript(win->kit, script, NULL, web_view_javascript_finished, NULL);
 	if (!orig)
 		webkit_settings_set_enable_javascript(s, FALSE);
+#if JAVASCRIPT_MARKUP_SHENNANIGANS
+	if (orig_markup)
+		webkit_settings_set_enable_javascript_markup(s, TRUE);
+#endif
 }
 
 static char *resolvepath(const char *path)
