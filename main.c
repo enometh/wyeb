@@ -1587,7 +1587,7 @@ static char *percent_escape_percent_file_url(char *resolved_path)
 static void _openuri(Win *win, const char *str, Win *caller)
 {
 	win->userreq = true;
-	if (!str || !*str) str = APP":main";
+	if (!str || !*str) str = APP":blank";
 
 	if (
 		g_str_has_prefix(str, "http:") ||
