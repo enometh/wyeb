@@ -5126,6 +5126,122 @@ static bool urihandler(Win *win, const char *uri, char *group)
 	g_free(command);
 	return true;
 }
+
+/* kill_cookies before allowing a url to be loaded.  If the accept
+   policy is "Never", then don't send cookies.  Unfortunately because
+   of webkit design this means we have to delete any cookies for that
+   url before loading it.  This has to be done done asynchronously (in
+   4 levels) through the decide-policy callback, where we first get a
+   ref on the policy decision object to make that signal block.  Then
+   asynchronously check the accept policy, and if it is "Never", then
+   asynchronously retrieve all cookies for the request, then
+   asynchronously delete those cookies.  When the last cookie is
+   deleted the last ref on the decision object is also dropped, and
+   this is deemed as a use decision. */
+
+void
+kill_cookies_cb2(GObject *cm, GAsyncResult *res, gpointer dec)
+{
+  GError *gerror = NULL;
+  gboolean ret = webkit_cookie_manager_delete_cookie_finish
+    ((WebKitCookieManager *)cm, res, &gerror);
+  if (gerror) {
+    fprintf_gerror(stderr, gerror, "kill_cookies_cb2: failed. unblocking use decision\n");
+    g_object_unref(dec);
+    g_error_free(gerror);
+    return;
+  }
+  if (!ret) {
+    fprintf(stderr, "kill_cookies_cb2: delete cookie failed. unblocking use decision\n");
+    g_object_unref(dec);
+    return;
+  }
+  g_object_unref(dec);
+}
+
+WebKitURIRequest *
+decision_request_uri(WebKitPolicyDecision *dec)
+{
+	/* Another webkitgtk design gem: How can we know if dec is a
+	 WebKitNavigationPolicyDecision or if it is a
+	 WebKitResponcePolicyDecision?  This information is not
+	 available. So check the "request" object property. This is
+	 deprectated for the NavigationPolicyDecision, so jump through
+	 that hoop too */
+	WebKitURIRequest *req = NULL;
+	g_object_get(dec, "request", &req, NULL);
+	if (req == NULL) {
+		WebKitNavigationAction *nav = NULL;
+		g_object_get(dec, "navigation-action", &nav, NULL);
+		if (nav) {
+			req = webkit_navigation_action_get_request(nav);
+			g_object_unref(nav); // call webkit_navigation_action_free() instead?
+		}
+	}
+	return req;
+}
+
+void
+kill_cookies_cb1(GObject *cm, GAsyncResult *res, gpointer dec)
+{
+  GError *gerror = NULL;
+  GList *gl = webkit_cookie_manager_get_cookies_finish
+    ((WebKitCookieManager *)cm, res, &gerror);
+  if (gerror) {
+    fprintf_gerror(stderr, gerror, "kill_cookies_cb1: failed. unblocking use decision\n");
+    g_object_unref(dec);
+    g_error_free(gerror);
+    return;
+  }
+  if (!gl) {
+    g_object_unref(dec);
+    return;
+  }
+  while (gl) {
+    g_object_ref(dec);
+    WebKitURIRequest *req = decision_request_uri(dec);
+    fprintf(stderr, "kill_cookies_cb1: deleting cookie for url: %s\n%s\n",
+	    webkit_uri_request_get_uri(req),
+	    soup_cookie_to_cookie_header(gl->data));
+    g_object_unref(req);
+    webkit_cookie_manager_delete_cookie
+      ((WebKitCookieManager *)cm, gl->data, NULL, kill_cookies_cb2, dec);
+    gl = gl->next;
+  }
+  g_object_unref(dec);
+}
+
+void
+kill_cookies_cb0(GObject *cm, GAsyncResult *res, gpointer dec)
+{
+  GError *gerror = NULL;
+  WebKitCookieAcceptPolicy pol = webkit_cookie_manager_get_accept_policy_finish
+    ((WebKitCookieManager *) cm, res, &gerror);
+  if (gerror) {
+    fprintf_gerror(stderr, gerror, "kill_cookies_cb0: failed. unblocking use decision\n");
+    g_object_unref(dec);
+    g_error_free(gerror);
+    return;
+  }
+  if (pol == WEBKIT_COOKIE_POLICY_ACCEPT_NEVER) {
+    WebKitURIRequest *req = decision_request_uri(dec);
+    webkit_cookie_manager_get_cookies
+      ((WebKitCookieManager *)cm,
+       webkit_uri_request_get_uri(req), NULL, kill_cookies_cb1, dec);
+    g_object_unref(req);
+  } else {
+    g_object_unref(dec);
+  }
+}
+
+void
+kill_cookies(WebKitPolicyDecision *dec)
+{
+  g_object_ref(dec);
+  webkit_cookie_manager_get_accept_policy
+    (webkit_web_context_get_cookie_manager(ctx), NULL, kill_cookies_cb0, dec);
+}
+
 static gboolean policycb(
 		WebKitWebView *v,
 		void *dec, //WebKitPolicyDecision
@@ -5139,7 +5255,7 @@ static gboolean policycb(
 		webkit_policy_decision_download(dec);
 		return true;
 	} else 	if (type == WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION) {
-		webkit_policy_decision_use(dec);
+		kill_cookies(dec); //webkit_policy_decision_use(dec);
 		return true;
 	}
 
@@ -5191,13 +5307,13 @@ static gboolean policycb(
 	{
 		if (mainframe)
 			resetconf(win, webkit_uri_response_get_uri(res), 0);
-		webkit_policy_decision_use(dec);
+		kill_cookies(dec); //webkit_policy_decision_use(dec);
 	}
 	else if (dl)
 		webkit_policy_decision_download(dec);
 	else {
 		fprintf(stderr, "WIP: to fail\n");
-		webkit_policy_decision_use(dec);
+		kill_cookies(dec); //webkit_policy_decision_use(dec);
 	}
 
 	return true;
