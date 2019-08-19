@@ -2926,7 +2926,7 @@ static Keybind dkeys[]= {
 //	{"clearallwebsitedata", 'C', GDK_CONTROL_MASK},
 	{"edit"          , 'e', 0, "Edit current uri conf or mainpage"},
 	{"editconf"      , 'E', 0},
-	{"openconfigdir" , 'c', 0},
+	{"openconfigdir" , 'e', GDK_CONTROL_MASK},
 
 	{"setv"          , 'v', 0, "Use the 'set:v' group"},
 	{"setscript"     , 's', GDK_CONTROL_MASK, "Use the 'set:script' group"},
@@ -2957,6 +2957,12 @@ static Keybind dkeys[]= {
 	{"tohintimagenew",  ';', 0},
 	{"tohintimageback", ':', GDK_CONTROL_MASK},
 	{"tohintimagedl",   'D', GDK_CONTROL_MASK},
+
+	{"copytoclipboard", 0, 0},
+	{"copytoprimary",   0, 0},
+	{"tohintimagecopyclipboard", 'C', 0},
+	{"tohintimagecopyprimary",   'c', 0},
+
 
 	{"openback"      , 0, 0},
 	{"openwithref"   , 0, 0, "Current uri is sent as Referer"},
@@ -3381,6 +3387,13 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 				}
 				_showmsg(win, msg);
 					})
+
+		// XXX code duplicated with yankuri*
+		Z("copytoclipboard",
+		  gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_CLIPBOARD), arg, -1))
+		Z("copytoprimary",
+		  gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY), arg, -1))
+
 	}
 
 	Z("tonormal"    , win->mode = Mnormal)
@@ -3415,6 +3428,9 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	H("tohintimagenew",  Cimage , "opennew" ,  NULL, NULL, Mhint)
 	H("tohintimageback", Cimage , "openback",  NULL, NULL, Mhint)
 	H("tohintimagedl",   Cimage , "dlwithheaders",  NULL, NULL, Mhint)
+
+	H("tohintimagecopyclipboard", Cimage, "copytoclipboard", NULL, NULL, Mhint)
+	H("tohintimagecopyprimary", Cimage, "copytoprimary", NULL, NULL, Mhint)
 
 	H("tohintdl"      , Curi  , getsetbool(win, "dlwithheaders") ?
 			"dlwithheaders" : "download"  , NULL, NULL, Mhint)
