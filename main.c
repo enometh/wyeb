@@ -1517,12 +1517,20 @@ static int formaturi(char **uri, char *key, const char *arg, char *spare)
 // malloc'ed. Returns the new string if escpaed..
 static char *percent_escape_percent_file_url(char *resolved_path)
 {
+    g_autoptr(SoupURI) suri = soup_uri_new(resolved_path);
+    const char *fragment = suri ? soup_uri_get_fragment(suri) : 0;
+
     GFile *gfile = g_file_new_for_commandline_arg(resolved_path);
     gchar *fileURL = g_file_get_uri(gfile);
     g_object_unref(gfile);
     g_free(resolved_path);
-    return fileURL;
 
+    if (fragment) {
+      char *b = g_strdup_printf("%s#%s", fileURL, fragment);
+      g_free(fileURL);
+      fileURL = b;
+    }
+    return fileURL;
 
   GError *err = NULL;
   char *ret = g_filename_to_uri(resolved_path, NULL, &err);
@@ -1561,6 +1569,11 @@ static char *percent_escape_percent_file_url(char *resolved_path)
 }
 
 
+//fwd
+static gboolean maybe_reuse(Win *curwin, const char *uri, gboolean new_if_reuse_fails);
+static Win *maybe_newwin(const char *uri, Win *cbwin, Win *caller, int back);
+static void reusemode(Win *win, const char *arg);
+
 static void _openuri(Win *win, const char *str, Win *caller)
 {
 	win->userreq = true;
@@ -1576,6 +1589,7 @@ static void _openuri(Win *win, const char *str, Win *caller)
 		g_str_has_prefix(str, "about:") ||
 		g_str_has_prefix(str, "inspector:")
 	) {
+		if (maybe_reuse(win, str, false)) return;
 		setatom(win, atomUri, URI(win));
 		webkit_web_view_load_uri(win->kit, str);
 		return;
@@ -1656,6 +1670,7 @@ out:
 					checklen, max));
 	else
 	{
+		if (!maybe_reuse(win, uri, false))
 		webkit_web_view_load_uri(win->kit, uri);
 
 		SoupURI *suri = soup_uri_new(uri);
@@ -3137,7 +3152,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 
 	fprintf(stderr, "main run: action=%s\n", action);
 	Z("quitall"     , gtk_main_quit())
-	Z("new"         , win = newwin(arg, NULL, NULL, 0))
+	Z("new"         , maybe_newwin(arg, NULL, win, 0))
 	Z("plugto"      , plugto = atol(exarg ?: arg ?: "0");
 			return run(win, "new", exarg ? arg : NULL))
 
@@ -3198,7 +3213,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	if (arg != NULL) {
 		Z("find"   , find(win, arg, true, false))
 		Z("open"   , openuri(win, arg))
-		Z("opennew", newwin(arg, NULL, win, 0))
+		Z("opennew", maybe_newwin(arg, NULL, win, 0))
 
 		Z("bookmark",
 				agv = g_strsplit(arg, " ", 2); addlink(win, agv[1], *agv);)
@@ -3426,6 +3441,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 		Z("copytoprimary",
 		  gtk_clipboard_set_text(gtk_clipboard_get(GDK_SELECTION_PRIMARY), arg, -1))
 
+		Z("reusemode", reusemode(win, arg))
 	}
 
 	Z("tonormal"    , win->mode = Mnormal)
@@ -6294,6 +6310,94 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 				   sizeof(void *) * 3));
 
 	return win;
+}
+
+static int reuse = 1;
+
+static void
+reusemode(Win *win, const char *arg) {
+	if (strcmp(arg, "status") == 0) {
+		_showmsg(win, g_strdup_printf("reuse windows mode is %s\n",
+					      reuse ? "on" : "off"));
+	} else if (strcmp(arg, "on") == 0) {
+		int old = reuse;
+		reuse = 1;
+		_showmsg(win, g_strdup_printf("reuse windows on: %schanged\n",
+					     old == reuse ? "un" : ""));
+	} else if (strcmp(arg, "off") == 0) {
+		int old = reuse;
+		reuse = 0;
+		_showmsg(win, g_strdup_printf("reuse windows off: %schanged\n",
+					     old == reuse ? "un" : ""));
+	} else if (strcmp(arg, "toggle") == 0) {
+		int old = reuse;
+		reuse = old ? 0 : 1;
+		_showmsg(win, g_strdup_printf("reuse windows toggle  %schanged: now %s\n",
+					     old == reuse ? "un" : "",
+					     reuse ? "ON" : "OFF"));
+	} else {
+		_showmsg(win, g_strdup_printf("unknown argument to reusemode: %s\n", arg));
+	}
+}
+
+static gboolean
+maybe_reuse(Win *curwin, const char *uri, gboolean new_if_reuse_fails)
+{
+	if (!reuse) return false;
+	Win *win = NULL;
+	g_autoptr(SoupURI) suri0 = soup_uri_new(uri);
+	gboolean fragmentp = suri0 ? soup_uri_get_fragment(suri0) != NULL : 0;
+	if (suri0) {
+		soup_uri_set_fragment(suri0, NULL);
+	} else {
+		fprintf(stderr, "NULL SoupURI for URI %s", uri);
+	}
+	for (int i = 0; i < wins->len; i++) {
+		Win *owin = (Win *) (wins->pdata[i]);
+		const char *ouri = URI(owin);
+		if (ouri && *ouri) {
+			if (suri0) {
+				g_autoptr(SoupURI) souri = soup_uri_new(ouri);
+				soup_uri_set_fragment(souri, NULL);
+				if (soup_uri_equal(suri0, souri)) {
+					win = owin;
+					break;
+				}
+			}
+		} else {
+			fprintf(stderr, "NULL SoupURI for URI %s.", ouri);
+			if (!strcmp(uri, URI(owin))) {
+				win = owin; break;
+			}
+		}
+	}
+	if (win) {
+		present(win);
+		if (fragmentp) {
+			fprintf(stderr,"\n\nFRAGMENT; ouri=%s opening uri: %s\n\n", URI(win), uri);
+			webkit_web_view_load_uri(win->kit, uri);
+		}
+		return true;
+	}
+	if (new_if_reuse_fails) {
+		newwin(uri, NULL, curwin, 0);
+		return true;
+	}
+	return false;
+}
+
+static Win *
+maybe_newwin(const char *uri, Win *cbwin, Win *caller, int back)
+{
+	  Win *last = LASTWIN, *win = NULL;
+	  fprintf(stderr, "maybe_newwin: LASTWIN=%p\n", LASTWIN);
+	  if (reuse && LASTWIN && maybe_reuse(LASTWIN, uri, true)) {
+		  fprintf(stderr, "reuse %s succeeded. last=%p LASTWIN=%p \n", uri, last, LASTWIN);
+		  win = LASTWIN;
+	  } else {
+		  win = newwin(uri, cbwin, caller, back);
+	  }
+	  return win;
 }
 
 
