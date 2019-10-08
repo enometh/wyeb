@@ -272,6 +272,12 @@ static Cmd choices[] = {
 #if JAVASCRIPT_MARKUP_SHENNANIGANS
 	{ "toggle-noscript", cmd_send_set3, { .v = "noscript" } },
 #endif
+
+	{ "toggle-reuse-windows", NULL, { .v = "toggle" }, "reusemode" },
+	{ "reuse-windows-status", NULL, { .v = "status" }, "reusemode" },
+	{ "reuse-windows-on", NULL, { .v = "on" }, "reusemode" },
+	{ "reuse-windows-off", NULL, { .v = "off" }, "reusemode" },
+
 };
 
 void surf_cmdprompt(Win *w)
