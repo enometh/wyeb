@@ -2926,8 +2926,8 @@ static Keybind dkeys[]= {
 
 	{"yankuri"       , 'y', 0, "Clipboard"},
 	{"yanktitle"     , 'Y', 0, "Clipboard"},
-	{"bookmark"      , 'b', 0, "arg: \"\" or \"uri + ' ' + label\""},
-	{"bookmarkbreak" , 'B', 0, "Add line break to the main page"},
+	{"bookmark"      , 'b', GDK_CONTROL_MASK, "arg: \"\" or \"uri + ' ' + label\""},
+	{"bookmarkbreak" , 'B', GDK_CONTROL_MASK, "Add line break to the main page"},
 
 	{"quit"          , 'q', 0},
 	{"quitall"       , 'Q', 0},
