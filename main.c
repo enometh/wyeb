@@ -6202,12 +6202,24 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 #endif
 	}
 	WebKitUserContentManager *cmgr = webkit_user_content_manager_new();
-	win->kito = cbwin ?
-		g_object_new(WEBKIT_TYPE_WEB_VIEW,
-				"related-view", cbwin->kit, "user-content-manager", cmgr, NULL)
-		:
-		g_object_new(WEBKIT_TYPE_WEB_VIEW,
-				"web-context", ctx, "user-content-manager", cmgr, NULL);
+	gboolean singlewebproc = false;
+	if (cbwin) {
+		g_message("NEWWIN related view for callback win");
+		win->kito = g_object_new(WEBKIT_TYPE_WEB_VIEW,
+					 "related-view", cbwin->kit, "user-content-manager", cmgr, NULL);
+	} else if ((singlewebproc = !g_key_file_get_boolean(conf, "boot", "multiwebprocs", NULL)) && caller) {
+		g_message("NEWWIN related view for caller win");
+		win->kito = g_object_new(WEBKIT_TYPE_WEB_VIEW,
+					 "related-view", caller->kit, "user-content-manager", cmgr, NULL);
+	} else if (singlewebproc && LASTWIN) {
+		g_message("NEWWIN related view for LASTWIN");
+		win->kito = g_object_new(WEBKIT_TYPE_WEB_VIEW,
+					 "related-view", win->kit, "user-content-manager", cmgr, NULL);
+	} else {
+		g_message("NEWWIN newwin");
+		win->kito = g_object_new(WEBKIT_TYPE_WEB_VIEW,
+			     "web-context", ctx, "user-content-manager", cmgr, NULL);
+	}
 
 	g_object_set_data(win->kito, "win", win);
 	g_object_set_data(win->kito, "caller", caller);
