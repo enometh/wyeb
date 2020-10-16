@@ -6097,7 +6097,10 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 		g_free(data);
 		g_free(cache);
 
-		ctx = webkit_web_context_new_with_website_data_manager(mgr);
+		ctx = g_object_new (WEBKIT_TYPE_WEB_CONTEXT,
+                                    "website-data-manager", mgr,
+//                                    "process-swap-on-cross-site-navigation-enabled", FALSE,
+                                    NULL);
 
 		proxy_settings_from_conf(); //on creation
 
