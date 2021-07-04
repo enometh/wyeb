@@ -16,7 +16,7 @@ wyeb: main.c general.c makefile surfprop.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< \
 		-D_GNU_SOURCE \
 		-DGCR_API_SUBJECT_TO_CHANGE \
-		`pkg-config --cflags --libs gtk+-3.0 glib-2.0 webkit2gtk-4.0 gcr-3` \
+		`pkg-config --cflags --libs gtk+-3.0 glib-2.0 webkit2gtk-4.1 gcr-3` \
 		-DEXTENSION_DIR=\"$(EXTENSION_DIR)\" \
 		-DDISTROURI=\"$(DISTROURI)\" \
 		-DDISTRONAME=\"$(DISTRONAME)\" \
@@ -24,7 +24,7 @@ wyeb: main.c general.c makefile surfprop.h
 
 ext.so: ext.c general.c makefile
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< -shared -fPIC \
-		`pkg-config --cflags --libs gtk+-3.0 glib-2.0 webkit2gtk-4.0` \
+		`pkg-config --cflags --libs gtk+-3.0 glib-2.0 webkit2gtk-4.1` \
 		-DDEBUG=${DEBUG} -DJSC=${JSC}
 
 clean:

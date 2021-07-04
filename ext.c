@@ -380,14 +380,16 @@ static char *tofull(let te, char *uri)
 #else
 	char *bases = webkit_dom_node_get_base_uri((WebKitDOMNode *)te);
 #endif
-	SoupURI *base = soup_uri_new(bases);
-	SoupURI *full = soup_uri_new_with_base(base, uri);
+	GUri *base = g_uri_parse(bases, SOUP_HTTP_URI_FLAGS, NULL);
 
-	char *ret = soup_uri_to_string(full, false);
+	GUri *full = g_uri_parse_relative(base, uri,
+					   SOUP_HTTP_URI_FLAGS, NULL);
+
+	char *ret = g_uri_to_string(full);
 
 	g_free(bases);
-	soup_uri_free(base);
-	soup_uri_free(full);
+	g_uri_unref(base);
+	g_uri_unref(full);
 	return ret;
 }
 
@@ -2024,6 +2026,24 @@ icon_url_p_dom(const char *str, Page *page)
 	return false;
 }
 
+int
+uri_scheme_http_p(const char *uri)
+{
+  int i; const char *p;
+  for (i = 0, p = uri; *p; p++, i++)
+    switch(i) {
+    case 0: if (*p != 'h') return 0; break;
+    case 1: if (*p != 't') return 0; break;
+    case 2: if (*p != 't') return 0; break;
+    case 3: if (*p != 'p') return 0; break;
+    case 4: if (*p != 's') return 0; break;
+    default: return 0;
+    }
+  return 1;
+}
+
+#define SOUP_URI_VALID_FOR_HTTP(uri) ((uri) && uri_scheme_http_p(g_uri_get_scheme(uri)) && g_uri_get_host(uri) && g_uri_get_path(uri))
+
 static gboolean reqcb(
 		WebKitWebPage *p,
 		WebKitURIRequest *req,
@@ -2059,8 +2079,8 @@ static gboolean reqcb(
 		return false;
 	}
 
-	SoupURI *puri = NULL;
-	SoupURI *ruri = NULL;
+	GUri *puri = NULL;
+	GUri *ruri = NULL;
 
 	// the ui process sets page->w3mmode_status. If it is set by
 	// the ui process, use it. Otherwise use what is set by the
@@ -2161,13 +2181,14 @@ static gboolean reqcb(
 		}
 	} else if (w3mmode_status == W3MMODE_OFF) {
 	} else if (w3mmode_status == W3MMODE_SAME_HOST) {
-		ruri = ruri ?: soup_uri_new(reqstr);
-		puri = puri ?: soup_uri_new(pagestr);
+		ruri = ruri ?: g_uri_parse(reqstr, SOUP_HTTP_URI_FLAGS, NULL);
+		puri = puri ?: g_uri_parse(pagestr, SOUP_HTTP_URI_FLAGS, NULL);
 		if (SOUP_URI_VALID_FOR_HTTP(ruri)) {
 			if (!SOUP_URI_VALID_FOR_HTTP(puri) ||
-			    !soup_uri_host_equal(puri, ruri)) {
-				soup_uri_free(puri);
-				soup_uri_free(ruri);
+			    strcmp(g_uri_get_host(puri),
+				    g_uri_get_host(ruri))) {
+				g_uri_unref(puri);
+				g_uri_unref(ruri);
 				reason = "w3msamehost";
 				ret = true; goto end;
 			}
@@ -2211,8 +2232,8 @@ static gboolean reqcb(
 	}
 
 	//reldomainonly
-	puri = puri ?: soup_uri_new(pagestr);
-	const char *phost = soup_uri_get_host(puri);
+	puri = puri ?: g_uri_parse(pagestr, SOUP_HTTP_URI_FLAGS, NULL);
+	const char *phost = g_uri_get_host(puri);
 
 	//g_assert(strcmp(reason,"")==0);
 	if (strcmp(reason,"") != 0) {
@@ -2231,14 +2252,14 @@ static gboolean reqcb(
 			}
 		g_strfreev(cuts);
 
-		ruri = ruri ?: soup_uri_new(reqstr);
-		const char *rhost = soup_uri_get_host(ruri);
+		ruri = ruri ?: g_uri_parse(reqstr, SOUP_HTTP_URI_FLAGS, NULL);
+		const char *rhost = g_uri_get_host(ruri);
 
 		reason = "reldomain" ;
 		ret = rhost && !g_str_has_suffix(rhost, phost);
 	}
-	soup_uri_free(ruri);
-	soup_uri_free(puri);
+	g_uri_unref(ruri);
+	g_uri_unref(puri);
 
 out:
 	if (ret)

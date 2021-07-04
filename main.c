@@ -1517,8 +1517,8 @@ static int formaturi(char **uri, char *key, const char *arg, char *spare)
 // malloc'ed. Returns the new string if escpaed..
 static char *percent_escape_percent_file_url(char *resolved_path)
 {
-    g_autoptr(SoupURI) suri = soup_uri_new(resolved_path);
-    const char *fragment = suri ? soup_uri_get_fragment(suri) : 0;
+    g_autoptr(GUri) suri = g_uri_parse(resolved_path, SOUP_HTTP_URI_FLAGS, NULL);
+    const char *fragment = suri ? g_uri_get_fragment(suri) : 0;
 
     GFile *gfile = g_file_new_for_commandline_arg(resolved_path);
     gchar *fileURL = g_file_get_uri(gfile);
@@ -1673,9 +1673,9 @@ out:
 		if (!maybe_reuse(win, uri, false))
 		webkit_web_view_load_uri(win->kit, uri);
 
-		SoupURI *suri = soup_uri_new(uri);
+		GUri *suri = g_uri_parse(uri, SOUP_HTTP_URI_FLAGS, NULL);
 		if (suri)
-			soup_uri_free(suri);
+			g_uri_unref(suri);
 		else
 			_showmsg(win, g_strdup_printf("Invalid URI: %s", uri));
 	}
@@ -2529,6 +2529,8 @@ togglecookiepolicycb(GObject *mgr, GAsyncResult *res, gpointer _data)
 		webkit_cookie_manager_set_accept_policy(WEBKIT_COOKIE_MANAGER(mgr), new);
 }
 
+
+
 #include <utime.h>
 static void dltimestamp(const char *path, WebKitURIResponse *res, WebKitURIRequest *req)
 {
@@ -2563,15 +2565,24 @@ static void dltimestamp(const char *path, WebKitURIResponse *res, WebKitURIReque
 	}
 	if (lmtimestamp) {
 		fprintf(stderr, "timestamp %s to %s\n", path, lmtimestamp);
-		SoupDate *soupdate = soup_date_new_from_string(lmtimestamp);
-		if (soupdate) {
-			time_t t = soup_date_to_time_t(soupdate);
+		struct tm tmbuf;
+		memset(&tmbuf, 0, sizeof(tmbuf));
+		if (((char *) strptime(lmtimestamp,
+				       "%A, %d %B %Y %H:%M:%S %Z",
+				       &tmbuf)) == NULL) {
+			fprintf(stderr, "strptime failed on %s.\n",
+				lmtimestamp);
+		} else {
+			time_t t = mktime(&tmbuf);
+			if (t == -1) {
+				perror("mktime failed");
+				abort();
+			}
 			const struct utimbuf buf = { t , t };
 			struct stat info;
 			stat(path, &info);
 			if (t < info.st_mtime)
 				g_utime(path, &buf);
-			soup_date_free(soupdate);
 		}
 	}
 }
@@ -2587,21 +2598,21 @@ static void dltimestamp(const char *path, WebKitURIResponse *res, WebKitURIReque
 char *
 make_savepath(const char *uri, const char *basedir)
 {
-	SoupURI *souprequri = soup_uri_new(uri);
+	GUri *souprequri = g_uri_parse(uri, SOUP_HTTP_URI_FLAGS, NULL);
 	if (!souprequri) {
 		fprintf(stderr, "make_savepath: bad uri: %s\n", uri);
 		return NULL;
 	}
-	if (strcmp(soup_uri_get_scheme(souprequri), "file") == 0) {
+	if (strcmp(g_uri_get_scheme(souprequri), "file") == 0) {
 		fprintf(stderr, "make_savepath: refusing to make a path for a file url %s\n", uri);
-		//soup_uri_free(souprequri);
+		//g_uri_unref(souprequri);
 		return NULL;
 	}
 
-	const char *requripath = soup_uri_get_path(souprequri);
-	const char *requrihost = soup_uri_get_host(souprequri);
-	char *requriquery = (char *)soup_uri_get_query(souprequri);
-	char *requrifragment = (char *)soup_uri_get_fragment(souprequri);
+	const char *requripath = g_uri_get_path(souprequri);
+	const char *requrihost = g_uri_get_host(souprequri);
+	char *requriquery = (char *)g_uri_get_query(souprequri);
+	char *requrifragment = (char *)g_uri_get_fragment(souprequri);
 	if (requriquery) requriquery = g_strconcat("?", requriquery, NULL);
 	if (requrifragment) requrifragment = g_strconcat("#", requrifragment, NULL);
 	char *subpath = g_strconcat(requripath ?: "",
@@ -2618,7 +2629,7 @@ make_savepath(const char *uri, const char *basedir)
 	g_free(requrifragment);
 	if (!path) {
 		fprintf(stderr, "make_savepath: %s: failed\n", uri);
-		//soup_uri_free(souprequri);
+		//g_uri_unref(souprequri);
 		return NULL;
 	}
 	if (g_str_has_suffix(path, "/")) {
@@ -2661,7 +2672,7 @@ make_savepath(const char *uri, const char *basedir)
 		}
 		g_free(new_file);
 	}
-	//soup_uri_free(souprequri);
+	//g_uri_unref(souprequri);
 	g_free(dir);
 	if (failed) {
 		g_free(path);
@@ -3139,6 +3150,8 @@ parse_hintdata_at(Win *win, int x, int y)
 	}
 	return ret;
 }
+
+#include "soup-uri-normalize.c"
 
 //declaration
 static Win *newwin(const char *uri, Win *cbwin, Win *caller, int back);
@@ -5426,7 +5439,7 @@ eval_javascript(Win *win, const char *script)
 #endif
 	if (!orig)
 		webkit_settings_set_enable_javascript(s, TRUE);
-		webkit_settings_set_enable_javascript_markup(s, FALSE);
+	webkit_settings_set_enable_javascript_markup(s, FALSE);
 	webkit_web_view_run_javascript(win->kit, script, NULL, web_view_javascript_finished, NULL);
 	if (!orig)
 		webkit_settings_set_enable_javascript(s, FALSE);
@@ -6360,27 +6373,32 @@ maybe_reuse(Win *curwin, const char *uri, gboolean new_if_reuse_fails)
 {
 	if (!reuse) return false;
 	Win *win = NULL;
-	g_autoptr(SoupURI) suri0 = soup_uri_new(uri);
-	gboolean fragmentp = suri0 ? soup_uri_get_fragment(suri0) != NULL : 0;
-	if (suri0) {
-		soup_uri_set_fragment(suri0, NULL);
+	GUri *suri0 = NULL;
+	g_autoptr(GUri) suriX = g_uri_parse(uri, SOUP_HTTP_URI_FLAGS, NULL);
+	g_autoptr(GUri) copyX = NULL;
+	gboolean fragmentp = suriX ? g_uri_get_fragment(suriX) != NULL : 0;
+	if (suriX) {
+		copyX = soup_uri_copy(suriX, SOUP_URI_FRAGMENT, NULL, SOUP_URI_NONE);
+		suri0 = copyX;
 	} else {
-		fprintf(stderr, "NULL SoupURI for URI %s", uri);
+		fprintf(stderr, "NULL GUri for URI %s.\n", uri);
+		suri0 = suriX;
 	}
+
 	for (int i = 0; i < wins->len; i++) {
 		Win *owin = (Win *) (wins->pdata[i]);
 		const char *ouri = URI(owin);
 		if (ouri && *ouri) {
 			if (suri0) {
-				g_autoptr(SoupURI) souri = soup_uri_new(ouri);
-				soup_uri_set_fragment(souri, NULL);
+				g_autoptr(GUri) souriX = g_uri_parse(ouri, SOUP_HTTP_URI_FLAGS, NULL);
+				g_autoptr(GUri) souri = soup_uri_copy(souriX, SOUP_URI_FRAGMENT, NULL, SOUP_URI_NONE);
 				if (soup_uri_equal(suri0, souri)) {
 					win = owin;
 					break;
 				}
 			}
 		} else {
-			fprintf(stderr, "NULL SoupURI for URI %s.", ouri);
+			fprintf(stderr, "NULL GUri for URI %s.\n", ouri);
 			if (!strcmp(uri, URI(owin))) {
 				win = owin; break;
 			}
