@@ -225,6 +225,7 @@ static void _kitprops(bool set, GObject *obj, GKeyFile *kf, char *group);
 #define MAINC
 #include "general.c"
 #define FORDISP(s) sfree(webkit_uri_for_display(s))
+//#define FORDISP(s) (webkit_uri_for_display(s))
 
 #include "surfprop.h"
 
@@ -1459,8 +1460,11 @@ normal:
 	if (win->focusuri || win->link)
 	{
 		bool f = (win->usefocus && win->focusuri) || !win->link;
-		settitle(win, sfree(g_strconcat(f ? "Focus" : "Link",
-				": ", FORDISP(f ? win->focusuri : win->link), NULL)));
+		char *title=(g_strconcat(f ? "Focus" : "Link",
+				": ", FORDISP(f ? win->focusuri : win->link),
+					NULL));
+		settitle(win, title);
+		g_free(title);
 	}
 	else
 		settitle(win, NULL);
