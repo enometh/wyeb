@@ -614,7 +614,7 @@ static gboolean histcb(Win *win)
 		_mkdirif(histdir, false);
 
 		csize = 0;
-		for (ci = histfnum - 1; ci >= 0; ci--)
+		for (ci = 0; ci < histfnum; ci++)
 		{
 			GFA(histfile, g_build_filename(histdir, hists[ci], NULL))
 			struct stat info;
