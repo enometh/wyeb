@@ -1681,10 +1681,15 @@ static void _openuri(Win *win, const char *str, Win *caller)
 	char *dsearch;
 	if (regexec(url, str, 0, NULL, 0) == 0)
 		uri = g_strdup_printf("http://%s", str);
-	else if ((dsearch = getset(caller ?: win, "search")))
+	else if ((dsearch = getset(caller ?: win, "search")) && *dsearch)
 	{
 		checklen = formaturi(&uri, dsearch, str, dsearch);
 		GFA(win->lastsearch, g_strdup(str))
+	} else {
+		showmsg(win, "Invalid URI");
+		if (uri) g_free(uri);
+		g_strfreev(stra);
+		return;
 	}
 
 	if (!uri) uri = g_strdup(str);
