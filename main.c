@@ -2913,6 +2913,58 @@ static void viewsourceorheaders(Win *win, viewsourceorheaders_mode flag)
 }
 
 
+
+static void xhtml_to_html5_resourcecb(GObject *res, GAsyncResult *result, gpointer dest)
+{
+	Win *win = (Win *)dest;
+	gsize sz;
+	guchar *str = webkit_web_resource_get_data_finish(
+			(WebKitWebResource *)res, result, &sz, NULL);
+
+	if (!str) {
+		fprintf(stderr, "nothing to reload\n");
+		return;
+	}
+	static GRegex *xhtml_to_html5;
+	GError *err;
+	if (!xhtml_to_html5) {
+		err = NULL;
+		xhtml_to_html5 = g_regex_new
+			("<!DOCTYPE html[^>]*>[^<]*<html xmlns[^>]*>",
+			 G_REGEX_CASELESS,
+			 0,
+			 &err);
+		if (err) {
+			fprintf_gerror(stderr, err, "g_regex_new failed\n");
+			return;
+		}
+	}
+	err = NULL;
+	gchar *new_str = g_regex_replace_literal
+		(xhtml_to_html5, (gchar *) str, sz, 0,
+		 "<!DOCTYPE html>\n<html>\n", //G_MATCH_ANCHORED
+		 0,
+		 &err);
+	if (err) {
+		fprintf_gerror(stderr, err, "failed to fudge xhtml->html5\n");
+		return;
+	}
+
+	webkit_web_view_load_html(win->kit, new_str, URI(win));
+	g_free(str);
+	g_free(new_str);
+}
+
+
+static void
+xhtml_to_html5(Win *win)
+{
+	WebKitWebResource *res = webkit_web_view_get_main_resource(win->kit);
+	if (res)
+		webkit_web_resource_get_data(res, NULL, xhtml_to_html5_resourcecb, win);
+}
+
+
 //@actions
 typedef struct {
 	char *name;
@@ -3572,6 +3624,9 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	)
 	Z("bookmark"    , addlink(win, webkit_web_view_get_title(win->kit), URI(win)))
 	Z("bookmarkbreak", addlink(win, NULL, NULL))
+
+
+	Z("reloadashtml5", xhtml_to_html5(win));
 
 	Z("quit"        , gtk_widget_destroy(win->winw); return true)
 
