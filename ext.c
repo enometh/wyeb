@@ -32,6 +32,8 @@ along with wyeb.  If not, see <http://www.gnu.org/licenses/>.
 #define let void *
 #endif
 
+#include <assert.h>
+
 #include <ctype.h>
 #include <webkit2/webkit-web-extension.h>
 
@@ -2159,6 +2161,7 @@ static gboolean reqcb(
 
 	if (w3mmode_status == W3MMODE_ONE)  {
 		const char *respuri = webkit_web_page_get_uri(p);
+		assert(strcmp(respuri, pagestr) == 0);
 		if (reqstr && respuri) {
 			const char *g = reqstr;
 			const char *h = respuri;
@@ -2179,6 +2182,10 @@ static gboolean reqcb(
 					//ok
 				} else if (hlen == glen && strcmp(g, h) == 0) {
 					//ok
+				} else if (res) {
+				  fprintf(stderr, "???ALLOWING REDIRECT???\npagestr=%s\nrequri=%s\nrespuri=%s\n",
+					  respuri, reqstr, webkit_uri_response_get_uri(res));
+				  //ok
 				} else {
 					reason = "w3mone";
 					ret = true; goto end;
