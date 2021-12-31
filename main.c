@@ -5389,6 +5389,11 @@ static gboolean policycb(
 	WebKitResponsePolicyDecision *rdec = dec;
 	WebKitURIResponse *res = webkit_response_policy_decision_get_response(rdec);
 
+	if (res && getsetbool(win, "stdoutheaders"))
+		print_headers(webkit_uri_response_get_http_headers(res),
+			      stdout,
+			      "response ======>\n");
+
 	if(!SOUP_STATUS_IS_SUCCESSFUL(webkit_uri_response_get_status_code(res)))
 		return false;
 
