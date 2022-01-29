@@ -6188,7 +6188,6 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 		char* extdir = (char *) g_getenv("WEBKIT_EXT_DIR");
 		if (extdir && !g_file_test(extdir, G_FILE_TEST_IS_DIR)) {
 			fprintf(stderr, "init_web_extensions: bogus WEBKIT_EXT_DIR=%s\n", extdir);
-			g_free(extdir);
 			extdir = NULL;
 		} else {
 			if (extdir) extdir = strdup(extdir);
