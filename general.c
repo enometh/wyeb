@@ -675,7 +675,7 @@ static bool ipcsend(char *name, char *str) {
 		g_free(esc);
 		close(cpipe);
 
-		D(ipcsend -end- %s %s %b, name, str, ret)
+		D(ipcsend -end- %s %s %d, name, str, ret)
 	}
 	return ret;
 }
