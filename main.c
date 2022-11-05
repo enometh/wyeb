@@ -1577,6 +1577,7 @@ static void _openuri(Win *win, const char *str, Win *caller)
 		g_str_has_prefix(str, "data:") ||
 		g_str_has_prefix(str, "blob:") ||
 		g_str_has_prefix(str, "about:") ||
+		g_str_has_prefix(str, "webkit:") ||
 		g_str_has_prefix(str, "inspector:")
 	) {
 		if (maybe_reuse(win, str, false)) return;
@@ -3180,6 +3181,8 @@ parse_hintdata_at(Win *win, int x, int y)
 #include "soup-uri-normalize.c"
 #endif
 
+#include "extraschemes.c"	/* for setcontentfiler, also see schemecb below */
+
 //declaration
 static Win *newwin(const char *uri, Win *cbwin, Win *caller, int back);
 static bool _run(Win *win, const char* action, const char *arg, char *cdir, char *exarg)
@@ -3246,6 +3249,39 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			goto out;
 		}
 	}
+
+
+	// if identifier is not specified uses the default identifier.
+	// automatically adds the stored filter into the usercontentmanager
+	Z("registercontentfilter", /* arg: "pathname identifier" */
+	  WebKitUserContentFilter *cf = NULL;
+	  agv = g_strsplit(arg, " ", 2);
+	  g_message("agv[1]=%s, *agv=%s", agv[1], *agv);
+	  if (opContentFilter(CONTENT_FILTER_STORE_SAVE, agv[1], *agv, &cf)) {
+		  webkit_user_content_manager_add_filter(
+			  webkit_web_view_get_user_content_manager(win->kit), cf);
+		  webkit_user_content_filter_unref(cf);
+	  })
+
+	// automatically first removes the filter from the usercontentmanager
+	Z("unregistercontentfilterid", /* arg: "identifier" */
+	  webkit_user_content_manager_remove_filter_by_id(
+		  webkit_web_view_get_user_content_manager(win->kit),
+		  !arg || g_strcmp0("", arg) == 0 ? APP "Filter" : arg);
+	  opContentFilter(CONTENT_FILTER_STORE_REMOVE, arg, NULL, NULL))
+
+	Z("addcontentfilterid", /* arg: "identifier" */
+	  WebKitUserContentFilter *cf = NULL;
+	  if (opContentFilter(CONTENT_FILTER_STORE_LOAD, arg, NULL, &cf)) {
+		  webkit_user_content_manager_add_filter(
+			  webkit_web_view_get_user_content_manager(win->kit), cf);
+		  webkit_user_content_filter_unref(cf);
+	  })
+
+	Z("removecontentfilterid", /* arg: "identifier" */
+	  webkit_user_content_manager_remove_filter_by_id(
+		  webkit_web_view_get_user_content_manager(win->kit),
+		  !arg || g_strcmp0("", arg) == 0 ? APP "Filter" : arg))
 
 	if (arg != NULL) {
 		Z("find"   , find(win, arg, true, false))
@@ -4429,6 +4465,13 @@ static void schemecb(WebKitURISchemeRequest *req, gpointer p)
 					g_str_has_prefix(path + 7, "/all"));
 		else if (g_str_has_prefix(path, "help"))
 			data = helpdata();
+		else if (g_str_has_prefix(path, "data")) {
+			aboutDataHandleRequest(req, ctx);
+			goto done;
+		} else if (g_str_has_prefix(path, "itp")) {
+			aboutITPHandleRequest(req, ctx);
+			goto done;
+		}
 		if (!data)
 			data = g_strdup("<h1>Empty</h1>");
 		len = strlen(data);
@@ -4437,6 +4480,8 @@ static void schemecb(WebKitURISchemeRequest *req, gpointer p)
 	GInputStream *st = g_memory_input_stream_new_from_data(data, len, g_free);
 	webkit_uri_scheme_request_finish(req, st, len, type);
 	g_object_unref(st);
+
+done:
 	gtk_window_set_icon(win->win, NULL);
 }
 
@@ -6229,6 +6274,7 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 					webkit_web_context_get_website_data_manager(ctx), true);
 	}
 	WebKitUserContentManager *cmgr = webkit_user_content_manager_new();
+	(void) connect_ucm_aboutdata_script_callback(cmgr);
 	gboolean singlewebproc = false;
 	if (cbwin) {
 		g_message("NEWWIN related view for callback win");
@@ -6369,6 +6415,13 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 			      processx, win);
 
 	if (atomGo == 0) initatoms(win);
+
+	// enable default content blocker if it is set
+	WebKitUserContentFilter *cf = NULL;
+        if (opContentFilter(CONTENT_FILTER_STORE_LOAD, NULL, NULL, &cf)) {
+		webkit_user_content_manager_add_filter(cmgr, cf);
+		webkit_user_content_filter_unref(cf);
+	}
 
 	present(back && LASTWIN ? LASTWIN : win);
 
