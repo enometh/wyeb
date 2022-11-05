@@ -18,7 +18,7 @@ endif
 
 all: wyeb ext.so
 
-wyeb: main.c general.c makefile surfprop.h
+wyeb: main.c general.c makefile surfprop.h extraschemes.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< \
 		-D_GNU_SOURCE \
 		`pkg-config --cflags --libs gtk+-3.0 glib-2.0 $(WEBKIT) gcr-3` \
