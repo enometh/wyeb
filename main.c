@@ -3139,6 +3139,8 @@ static Keybind dkeys[]= {
 
 	{"applystyle"    , 0, 0, "Apply a css stylesheet"},
 
+	{"selectall"     , 'a', GDK_CONTROL_MASK, "SelectAll"},
+
 //todo pagelist
 //	{"windowimage"   , 0, 0}, //winid
 //	{"windowlist"    , 0, 0}, //=>winid uri title
@@ -4876,6 +4878,14 @@ static gboolean keycb(GtkWidget *w, GdkEventKey *ek, Win *win)
 			tonormal(win);
 
 		return keyr;
+	}
+
+	if (action && strcmp(action, "selectall") == 0) {
+		if (GTK_IS_EDITABLE (w))
+			gtk_editable_select_region (GTK_EDITABLE (w), 0, -1);
+		 else
+			 webkit_web_view_execute_editing_command (win->kit, "SelectAll");
+		return true;
 	}
 
 	if ((!action || win->mode == Minsert) &&
