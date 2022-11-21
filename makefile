@@ -16,6 +16,13 @@ else
 	CFLAGS += -Wno-deprecated-declarations
 endif
 
+# export PKG_CONFIG_PATH appropriately and invoke make with MKCLPLUG=1
+ifdef MKCLPLUG
+	CFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config mkclplug-1 --cflags) -DMKCLPLUG
+	LDFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH)  pkg-config mkclplug-1 --libs)
+endif
+
+
 all: wyeb ext.so
 
 wyeb: main.c general.c makefile surfprop.h extraschemes.c
