@@ -96,8 +96,10 @@ static void resetconf(Page *page, const char *uri, bool force)
 			GINT_TO_POINTER(getsetbool(page, "adblock") ? 'y' : 'n'));
 }
 
-
-static GPtrArray *pages;
+#ifndef MKCLPLUG
+static
+#endif
+	GPtrArray *pages;
 
 static void freepage(Page *page)
 {

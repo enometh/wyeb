@@ -194,6 +194,10 @@ struct _Spawn {
 };
 
 //@global
+#ifdef MKCLPLUG
+#define static __attribute__((visibility("default"))) 
+#endif
+
 static char      *suffix = "";
 static GPtrArray *wins;
 static GPtrArray *dlwins;
@@ -220,6 +224,10 @@ static bool ephemeral;
 //for xembed
 #include <gtk/gtkx.h>
 static long plugto;
+
+#ifdef MKCLPLUG
+#define static static
+#endif
 
 //shared code
 static void _kitprops(bool set, GObject *obj, GKeyFile *kf, char *group);
@@ -6764,6 +6772,12 @@ int main(int argc, char **argv)
 	wins = g_ptr_array_new();
 	dlwins = g_ptr_array_new();
 	histimgs = g_queue_new();
+
+#ifdef MKCLPLUG
+	extern void mkcl_initialize(const char *app);
+	if (!(g_strcmp0(g_getenv("WYEB_CL"),"none") == 0))
+	  mkcl_initialize("mkclplug");
+#endif
 
 	if (_run(NULL, action, uri, cwd, *exarg ? exarg : NULL))
 		gtk_main();
