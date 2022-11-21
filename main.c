@@ -193,6 +193,10 @@ struct _Spawn {
 };
 
 //@global
+#ifdef MKCLPLUG
+#define static __attribute__((visibility("default"))) 
+#endif
+
 static char      *suffix = "";
 static GPtrArray *wins;
 static GPtrArray *dlwins;
@@ -219,6 +223,16 @@ static bool ephemeral;
 //for xembed
 #include <gtk/gtkx.h>
 static long plugto;
+
+#ifdef MKCLPLUG
+#define static static
+#endif
+
+#ifdef MKCLPLUG
+#define STATIC __attribute__((visibility("default")))
+#else
+#define STATIC static
+#endif
 
 //shared code
 static void _kitprops(bool set, GObject *obj, GKeyFile *kf, char *group);
@@ -410,7 +424,7 @@ static bool isin(GPtrArray *ary, void *v)
 		if (v == ary->pdata[i]) return true;
 	return false;
 }
-static Win *winbyid(const char *pageid)
+STATIC Win *winbyid(const char *pageid)
 {
 	guint64 intid = atol(pageid);
 	Win *maychanged = NULL;
@@ -745,6 +759,11 @@ static void send(Win *win, Coms type, const char *args)
 		sfree(g_strdup_printf("0:%c:%s", type, args ?: "")) , NULL);
 	webkit_web_view_send_message_to_page(win->kit, msg, NULL, NULL, NULL);
 }
+//;madhu 240531 send has to be static because libdbus calls send(2)
+//and picks up this version
+void send_wrapper(Win *win, Coms type, const char *args) { send(win,type,args); }
+
+
 static void sendeach(Coms type, char *args)
 {
 	for (int i = 0; i < wins->len; i++)
@@ -1059,9 +1078,9 @@ void _kitprops(bool set, GObject *obj, GKeyFile *kf, char *group)
 	}
 }
 
-static void setcss(Win *win, char *namesstr); //declaration
-static void setscripts(Win *win, char *namesstr); //declaration
-static void resetconf(Win *win, const char *uri, int type)
+STATIC void setcss(Win *win, char *namesstr); //declaration
+STATIC void setscripts(Win *win, char *namesstr); //declaration
+STATIC void resetconf(Win *win, const char *uri, int type)
 { //type: 0: uri, 1:force, 2:overset, 3:file
 //	"reldomaindataonly", "removeheaders"
 	char *checks[] = {"reldomaincutheads", "rmnoscripttag", NULL};
@@ -1469,16 +1488,16 @@ normal:
 	else
 		settitle(win, NULL);
 }
-static void tonormal(Win *win)
+STATIC void tonormal(Win *win)
 {
 	win->mode = Mnormal;
 	update(win);
 }
 
-static void eval_javascript(Win *win, const char *script);//declaration
+STATIC void eval_javascript(Win *win, const char *script);//declaration
 
 //@funcs for actions
-static bool run(Win *win, char* action, const char *arg); //declaration
+STATIC bool run(Win *win, char* action, const char *arg); //declaration
 
 static int formaturi(char **uri, char *key, const char *arg, char *spare)
 {
@@ -5519,7 +5538,7 @@ web_view_javascript_finished(GObject      *object,
 	webkit_javascript_result_unref(js_result);
 }
 
-static void
+STATIC void
 eval_javascript(Win *win, const char *script)
 {
 	WebKitSettings *s = webkit_web_view_get_settings(win->kit);
@@ -5546,7 +5565,7 @@ static char *resolvepath(const char *path)
 	return g_build_filename(path, NULL);
 }
 
-static void
+STATIC void
 surfrunscript(Win *win)
 {
 	char *scriptfile = "~/.surf/script.js";
@@ -6697,9 +6716,14 @@ int main(int argc, char **argv)
 	dlwins = g_ptr_array_new();
 	histimgs = g_queue_new();
 
-	if (_run(NULL, action, uri, cwd, *exarg ? exarg : NULL))
+	if (_run(NULL, action, uri, cwd, *exarg ? exarg : NULL)) {
+#ifdef MKCLPLUG
+	extern void mkcl_initialize(const char *app);
+	if (!(g_strcmp0(g_getenv("WYEB_CL"),"none") == 0))
+	  mkcl_initialize("mkclplug");
+#endif
 		gtk_main();
-	else
+	} else
 		exit(1);
 	exit(0);
 }
