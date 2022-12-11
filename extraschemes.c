@@ -270,6 +270,36 @@ static void aboutITPHandleRequest(WebKitURISchemeRequest *request, WebKitWebCont
     webkit_website_data_manager_get_itp_summary(manager, NULL, (GAsyncReadyCallback)gotITPSummaryCallback, itpRequest);
 }
 
+
+// ----------------------------------------------------------------------
+//
+// ;madhu 221109, leech the automation stuff from MiniBrowser
+//
+static Win *newwin(const char *uri, Win *cbwin, Win *caller, int back);
+static GtkWidget *createWebViewForAutomationInWindowCallback(WebKitAutomationSession* session, Win *win)
+{
+  g_message("createWebViewForAutomationInWindowCallback");
+  if (win && win->kitw) return GTK_WIDGET(win->kitw);
+  Win *new_win = newwin("about:blank", AUTOMATION_CBWIN, win, 0);
+  return GTK_WIDGET(new_win->kitw);
+}
+
+static void automationStartedCallback(WebKitWebContext *webContext, WebKitAutomationSession *session, Win *win)
+{
+    WebKitApplicationInfo *info = webkit_application_info_new();
+    webkit_application_info_set_name (info, "Wyeb");
+    webkit_application_info_set_version(info, WEBKIT_MAJOR_VERSION, WEBKIT_MINOR_VERSION, WEBKIT_MICRO_VERSION);
+    webkit_automation_session_set_application_info(session, info);
+    webkit_application_info_unref(info);
+    g_signal_connect(session, "create-web-view", G_CALLBACK(createWebViewForAutomationInWindowCallback), win);
+}
+
+
+// ----------------------------------------------------------------------
+//
+//
+//
+
 typedef enum {
 	CONTENT_FILTER_STORE_LOAD,
 	CONTENT_FILTER_STORE_SAVE,
