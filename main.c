@@ -1334,6 +1334,7 @@ static void settitle(Win *win, const char *pstr)
 
 	const char *wtitle = webkit_web_view_get_title(win->kit) ?: "";
 	const char *title = pstr && !bar ? pstr : sfree(g_strconcat(
+                webkit_web_view_is_controlled_by_automation(win->kit) ? "[Auto]" : "",
 		win->tlserr ? "!TLS " : "",
 		suffix            , *suffix      ? "| " : "",
 		win->overset ?: "", win->overset ? "| " : "",
@@ -3202,6 +3203,9 @@ parse_hintdata_at(Win *win, int x, int y)
 #include "soup-uri-normalize.c"
 #endif
 
+// cookie to pass to newwin cbwin to indicate automation mode
+#define AUTOMATION_CBWIN (void *)0x01
+
 #include "extraschemes.c"	/* for setcontentfiler, also see schemecb below */
 
 //declaration
@@ -3219,6 +3223,9 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	Z("new"         , maybe_newwin(arg, NULL, win, 0))
 	Z("plugto"      , plugto = atol(exarg ?: arg ?: "0");
 			return run(win, "new", exarg ? arg : NULL))
+	Z("automation", newwin( !arg || !strcmp(arg,"bogus") ? // python selenium webdriver.WebKitGTKOptions.add_argument('') cannot handle empty argument. use add_argument("bogus") instead
+				"about:blank" : arg,
+				AUTOMATION_CBWIN, win, 0))
 
 #define CLIP(clip) \
 		char *uri = g_strdup_printf(arg ? "%s %s" : "%s%s", arg ?: "", \
@@ -6190,7 +6197,13 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 		makemenu(NULL);
 		preparewb();
 
-		ephemeral = g_key_file_get_boolean(conf, "boot", "ephemeral", NULL);
+		ephemeral = g_key_file_get_boolean(conf, "boot", "ephemeral", NULL)
+// we should make all automation sessions ephemeral. However because
+// wyeb sets it as a boot conf, the user will have to invoke ["wyeb"
+// ["ephe" "automation" "bogus"]] where ephe has boot.ephemeral=true
+// in its wyeb.ephe/main.conf
+			|| cbwin == AUTOMATION_CBWIN
+			;
 		char *data  = g_build_filename(g_get_user_data_dir() , fullname, NULL);
 		char *cache = g_build_filename(g_get_user_cache_dir(), fullname, NULL);
 		WebKitWebsiteDataManager *mgr = webkit_website_data_manager_new(
@@ -6301,26 +6314,46 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 		if (confbool("itp"))
 			webkit_website_data_manager_set_itp_enabled(
 					webkit_web_context_get_website_data_manager(ctx), true);
+		if (cbwin == AUTOMATION_CBWIN) {
+			webkit_web_context_set_automation_allowed(ctx, TRUE);
+			g_signal_connect(ctx, "automation-started", G_CALLBACK(automationStartedCallback), win);
+		}
 	}
+
 	WebKitUserContentManager *cmgr = webkit_user_content_manager_new();
 	(void) connect_ucm_aboutdata_script_callback(cmgr);
 	gboolean singlewebproc = false;
-	if (cbwin) {
+        if (cbwin == AUTOMATION_CBWIN) {
+               g_message("NEWWIN for automation");
+               win->kito = g_object_new(WEBKIT_TYPE_WEB_VIEW,
+					"web-context", ctx,
+					"user-content-manager", cmgr,
+					"is-controlled-by-automation", TRUE,
+					NULL);
+	} else if (cbwin) {
 		g_message("NEWWIN related view for callback win");
 		win->kito = g_object_new(WEBKIT_TYPE_WEB_VIEW,
-					 "related-view", cbwin->kit, "user-content-manager", cmgr, NULL);
+					 "related-view", cbwin->kit, "user-content-manager", cmgr, 
+					 "is-controlled-by-automation", caller ? webkit_web_view_is_controlled_by_automation(caller->kit) : FALSE,
+					 NULL);
 	} else if ((singlewebproc = !g_key_file_get_boolean(conf, "boot", "multiwebprocs", NULL)) && caller) {
 		g_message("NEWWIN related view for caller win");
 		win->kito = g_object_new(WEBKIT_TYPE_WEB_VIEW,
-					 "related-view", caller->kit, "user-content-manager", cmgr, NULL);
+					 "related-view", caller->kit, "user-content-manager", cmgr,
+					 "is-controlled-by-automation", caller ? webkit_web_view_is_controlled_by_automation(caller->kit) : FALSE,
+					 NULL);
 	} else if (singlewebproc && LASTWIN) {
 		g_message("NEWWIN related view for LASTWIN");
 		win->kito = g_object_new(WEBKIT_TYPE_WEB_VIEW,
-					 "related-view", win->kit, "user-content-manager", cmgr, NULL);
+					 "related-view", win->kit, "user-content-manager", cmgr,
+					 "is-controlled-by-automation", caller ? webkit_web_view_is_controlled_by_automation(caller->kit) : FALSE,
+					 NULL);
 	} else {
 		g_message("NEWWIN newwin");
 		win->kito = g_object_new(WEBKIT_TYPE_WEB_VIEW,
-			     "web-context", ctx, "user-content-manager", cmgr, NULL);
+			     "web-context", ctx, "user-content-manager", cmgr,
+					 "is-controlled-by-automation", caller ? webkit_web_view_is_controlled_by_automation(caller->kit) : FALSE,
+					 NULL);
 	}
 
 	g_object_set_data(win->kito, "win", win);
@@ -6454,7 +6487,7 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 
 	present(back && LASTWIN ? LASTWIN : win);
 
-	if (!cbwin)
+	if (!cbwin || cbwin == AUTOMATION_CBWIN)
 		g_timeout_add(40, (GSourceFunc) openuricb,
 				g_memdup((void *[]){win, g_strdup(uri), caller},
 				   sizeof(void *) * 3));
