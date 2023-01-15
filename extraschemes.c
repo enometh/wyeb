@@ -415,3 +415,97 @@ static void connect_ucm_aboutdata_script_callback(WebKitUserContentManager *user
 
 }
 
+
+// ----------------------------------------------------------------------
+//
+//  ;madhu 230115 extra stylesheets handling
+//
+// load files of the glob pattern "[0-9]*.css" found in
+// ~/.config/devhelp/styles/ (overridden by environment variable
+// STYLESDIR) sorted in g_utf8_collate_key_for_filename order
+// into webkit
+//
+#include <fnmatch.h>
+
+GList * listDirectory (const char *path, const char *filter);
+int natcmp0(gconstpointer a, gconstpointer b, gpointer user_data);
+void maybe_load_styles_from_stylesdir (WebKitWebView* view);
+
+int
+natcmp0(gconstpointer a, gconstpointer b, gpointer user_data)
+{
+  return g_strcmp0 (g_hash_table_lookup (user_data, a),
+		    g_hash_table_lookup (user_data, b));
+}
+
+GList *
+listDirectory (const char *path, const char *filter)
+{
+  GList *entries = NULL;
+  GError *err = NULL;
+  GDir *dir = NULL;
+  const char *name = NULL;
+  char *entry = NULL, *value = NULL;
+  static GHashTable *table = NULL;
+
+  dir = g_dir_open (path, 0, &err);
+  if (!dir) {
+    g_error ("listDirectory: failed to g_dir_open %s: %s\n", path,
+	     (err && err->message) ? err->message : "");
+    return entries;
+  }
+
+  table = g_hash_table_new_full (g_str_hash, g_str_equal,
+				 (GDestroyNotify) NULL,
+				 (GDestroyNotify) g_free);
+
+  while ((name = g_dir_read_name (dir))) {
+    if (fnmatch (filter, name, 0) != 0)
+	continue;
+    entry = g_build_filename (path, name, NULL);
+    value = g_utf8_collate_key_for_filename (entry, -1);
+    g_hash_table_insert (table, entry, value);
+    entries = g_list_prepend (entries, entry);
+  }
+
+  entries = g_list_sort_with_data (entries, natcmp0, table);
+  g_hash_table_destroy (table);
+  g_dir_close (dir);
+
+  return entries;
+}
+
+void
+maybe_load_styles_from_stylesdir (WebKitWebView* view)
+{
+  const char *dir;
+  GList *l, *entries;
+  char *stylesdir = NULL;
+
+  dir = g_getenv ("STYLESDIR");
+  if (!dir) {
+    // use path2conf
+          stylesdir = g_build_filename (g_get_user_config_dir (),
+                                        "devhelp", "styles", NULL);
+          dir = stylesdir;
+  }
+
+  entries = listDirectory (dir, "[0-9]*.css");
+  for (l = entries; l != NULL; l = l->next) {
+    char *file = l->data;
+    char *style = NULL;
+    if (!g_file_get_contents (file, &style, NULL, NULL)) {
+      g_warning ("Could not read style file: %s\n", file);
+      continue;
+    }
+    webkit_user_content_manager_add_style_sheet
+      (webkit_web_view_get_user_content_manager(view),
+       webkit_user_style_sheet_new(style,
+				   WEBKIT_USER_CONTENT_INJECT_ALL_FRAMES,
+				   WEBKIT_USER_STYLE_LEVEL_USER,
+				   NULL, NULL));
+    g_message("added style from %s", file);
+    g_free(style);
+  }
+  g_free (stylesdir);
+}
