@@ -2985,6 +2985,8 @@ xhtml_to_html5(Win *win)
 		webkit_web_resource_get_data(res, NULL, xhtml_to_html5_resourcecb, win);
 }
 
+void readability_mode(Win *win);
+#include "readability/readability.c"
 
 //@actions
 typedef struct {
@@ -3691,6 +3693,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 
 
 	Z("reloadashtml5", xhtml_to_html5(win));
+	Z("readermode", readability_mode(win));
 
 	Z("quit"        , gtk_widget_destroy(win->winw); return true)
 

@@ -1,0 +1,12 @@
+-*- Org -*-
+
+Support for https://github.com/mozilla/readability (Licensed under Apache2)
+by way of the implementation in epiphany gitlab.gnome.org/GNOME/epiphany
+(GPLv3)
+
+
+#+begin_src
+#!/bin/zsh
+~/extern/vimb-master/src/scripts/js2h.sh  $<(cpp /7/gtk/epiphany/third-party/readability/Readability.js | sed -e '/^#/d') > readability.h
+~/extern/vimb-master/src/scripts/js2h.sh  /7/gtk/epiphany/third-party/readability/reader.css >> readability.h
+#+end_src

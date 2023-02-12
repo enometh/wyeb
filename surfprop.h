@@ -279,6 +279,7 @@ static Cmd choices[] = {
 	{ "reuse-windows-off", NULL, { .v = "off" }, "reusemode" },
 
 	{ "reload-as-html5", NULL, { 0 }, "reloadashtml5" },
+	{ "readermode", NULL, { 0 }, "readermode" },
 };
 
 void surf_cmdprompt(Win *w)
