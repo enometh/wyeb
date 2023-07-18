@@ -230,6 +230,15 @@ cmd_add_security_exception(Win *win, const Arg *a)
 
 #define JS_F "function replace(reg,rep){old=window.document.documentElement.innerHTML;window.document.documentElement.innerHTML=old.replace(RegExp(reg,\"g\"),rep);}function displaynone(){replace(\"display:[\\t]*none\",\"\")}function dump(string){console.log(string);}function hide(tagname){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 if(elem.style.display!=\"none\"){		elem.style.display=\"none\";		count++	}	}}dump(\"hide(\"+tagname+\"):\"+count+\"\\n\");return count;}function showtag(tagname){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 if(elem.style.display==\"none\"){		elem.style.display=\"\";		count++	}	}}dump(\"showtag(\"+tagname+\"):\"+count+\"\\n\");return count;}function settags(tagname,attribute,value){count=0;for(var elem of document.getElementsByTagName(tagname)){	if(elem instanceof Element){	 elem.style.setProperty(attribute,value);	 count++;	}}dump(\"settag(tag=\"+tagname+\",attr=\"+attribute+\",val=\",	value+\"):\"+count+\"\\n\");return count;}function hideClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){	 if(elem.style.display!=\"none\"){		elem.style.display=\"none\";		count++	}	}}dump(\"hideClass(\"+name+\"):\"+count+\"\\n\");return count;}function purgeClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){		elem.parentNode.removeChild(elem);		count++;	}}dump(\"purgeClass(\"+name+\"):\"+count+\"\\n\");return count;}function showClass(name){count=0;for(var elem of document.getElementsByClassName(name)){	if(elem instanceof Element){	 if(elem.style.display==\"none\"){		elem.style.display=\"\";		count++	}	}}dump(\"showClass(\"+name+\"):\"+count+\"\\n\");return count;}function setClassAttr(className,attribute,value){count=0;for(var elem of document.getElementsByClassName(className)){	if(elem instanceof Element){	 elem.style.setProperty(attribute,value);	 count++;	}}dump(\"setClassAttr(class=\"+className+\",attr=\"+attribute+\",val=\",	value+\"):\"+count+\"\\n\");return count;}"
 
+
+#ifdef MKCLPLUG
+static void
+initmkclplug(Win *win, const Arg *a) {
+	extern void mkcl_initialize(const char *app);
+	mkcl_initialize("mkclplug");
+}
+#endif
+
 static Cmd choices[] = {
 	{ "foo",		foo,	{ 0 } },
 	{ "reload-with-charset", NULL, { 0 }, "surfcharset" },
@@ -280,6 +289,11 @@ static Cmd choices[] = {
 
 	{ "reload-as-html5", NULL, { 0 }, "reloadashtml5" },
 	{ "readermode", NULL, { 0 }, "readermode" },
+
+#ifdef MKCLPLUG
+	{ "initmkclplug", initmkclplug, { 0 } },
+#endif
+
 };
 
 void surf_cmdprompt(Win *w)
