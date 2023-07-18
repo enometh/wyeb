@@ -2269,8 +2269,8 @@ bool winlist(Win *win, guint type, cairo_t *cr)
 		}
 		cairo_clip(cr);
 
-		if (!plugto
-				&& gtk_widget_get_visible(lw->kitw)
+		if (/*!plugto
+				&& */gtk_widget_get_visible(lw->kitw)
 				&& gtk_widget_is_drawable(lw->kitw)
 		) {
 			cairo_scale(cr, scale, scale);
