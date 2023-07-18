@@ -6754,9 +6754,8 @@ int main(int argc, char **argv)
 
 	if (_run(NULL, action, uri, cwd, *exarg ? exarg : NULL)) {
 #ifdef MKCLPLUG
-	extern void mkcl_initialize(const char *app);
 	if (!(g_strcmp0(g_getenv("WYEB_CL"),"none") == 0))
-	  mkcl_initialize("mkclplug");
+		initmkclplug(NULL, NULL);
 #endif
 		gtk_main();
 	} else
