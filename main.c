@@ -5511,8 +5511,11 @@ static gboolean policycb(
 			      stdout,
 			      "response ======>\n");
 
-	if(!SOUP_STATUS_IS_SUCCESSFUL(webkit_uri_response_get_status_code(res)))
-		return false;
+	if(!SOUP_STATUS_IS_SUCCESSFUL(webkit_uri_response_get_status_code(res))) {
+		// ;madhu 180620 always load local file content
+		webkit_policy_decision_use(dec);
+		return true;
+	}
 
 	bool dl = false;
 	char *msr = getset(win, "dlmimetypes");
