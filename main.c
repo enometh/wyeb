@@ -6812,15 +6812,14 @@ int main(int argc, char **argv)
 	dlwins = g_ptr_array_new();
 	histimgs = g_queue_new();
 
+	if (_run(NULL, action, uri, cwd, *exarg ? exarg : NULL)) {
 #ifdef MKCLPLUG
 	extern void mkcl_initialize(const char *app);
 	if (!(g_strcmp0(g_getenv("WYEB_CL"),"none") == 0))
 	  mkcl_initialize("mkclplug");
 #endif
-
-	if (_run(NULL, action, uri, cwd, *exarg ? exarg : NULL))
 		gtk_main();
-	else
+	} else
 		exit(1);
 	exit(0);
 }

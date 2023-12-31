@@ -18,8 +18,8 @@ endif
 
 # export PKG_CONFIG_PATH appropriately and invoke make with MKCLPLUG=1
 ifdef MKCLPLUG
-	CFLAGS += $(shell pkg-config mkclplug-1 --cflags) -DMKCLPLUG
-	LDFLAGS += $(shell pkg-config mkclplug-1 --libs)
+	CFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config mkclplug-1 --cflags) -DMKCLPLUG
+	LDFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH)  pkg-config mkclplug-1 --libs)
 endif
 
 
