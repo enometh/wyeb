@@ -68,6 +68,8 @@ typedef struct _WP {
 	char          *overset;
 	bool           setagent;
 	bool           setagentprev;
+	bool setaccept;
+	bool setacceptprev;
 
 	//overrides conf value for w3mmode setting if set to something
 	//other than W3MMODE_USECONF
@@ -88,6 +90,9 @@ static void resetconf(Page *page, const char *uri, bool force)
 {
 	page->setagentprev = page->setagent && !force;
 	page->setagent = false;
+
+	page->setacceptprev = page->setaccept && !force;
+	page->setaccept = false;
 
 	_resetconf(page, uri, force);
 
@@ -2265,6 +2270,9 @@ out:
 		if (/*page->pagereq == 1 &&*/(page->setagent || page->setagentprev))
 			soup_message_headers_replace(head, "User-Agent",
 					getset(page, "user-agent") ?: "");
+		if (/*page->pagereq == 1 &&*/(page->setaccept || page->setacceptprev))
+			soup_message_headers_replace(head, "Accept",
+					getset(page, "accept") ?: "");
 
 		char *rmhdrs = getset(page, "removeheaders");
 		if (rmhdrs)

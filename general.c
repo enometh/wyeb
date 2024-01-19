@@ -351,6 +351,8 @@ static void setprops(WP *wp, GKeyFile *kf, char *group)
 	setprop(wp, kf, group, "javascript-can-open-windows-automatically");
 	if (setprop(wp, kf, group, "user-agent") && strcmp(group, DSET))
 		wp->setagent = true;
+	if (setprop(wp, kf, group, "accept") && strcmp(group, DSET))
+		wp->setaccept = true;
 #endif
 
 	//non webkit settings
