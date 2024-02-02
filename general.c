@@ -24,6 +24,15 @@ along with wyeb.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib/gstdio.h>
 #include <regex.h>
 
+#ifndef STATIC
+#ifdef MKCLPLUG
+#define STATIC __attribute__((visibility("default")))
+#else
+#define STATIC static
+#endif
+#endif
+
+
 /*
  * enable-javascript-markup is exposed in 2.24.0. enable-javascript is
  * required for JSC and should always be true. If using 2.24.0+
@@ -98,16 +107,16 @@ along with wyeb.  If not, see <http://www.gnu.org/licenses/>.
 	g_signal_connect_swapped(o, n, G_CALLBACK(c), u)
 #define GFA(p, v) {void *__b = p; p = v; g_free(__b);}
 
-static char *sfree(char *p)
+STATIC char *sfree(char *p)
 {
 	static void *s;
 	g_free(s);
 	return s = p;
 }
 
-static char *fullname = "";
-static GKeyFile *conf;
-static char *confpath;
+STATIC char *fullname = "";
+STATIC GKeyFile *conf;
+STATIC char *confpath;
 
 typedef struct _WP WP;
 
@@ -153,7 +162,7 @@ typedef struct {
 	char *val;
 	char *desc;
 } Conf;
-static Conf dconf[] = {
+STATIC Conf dconf[] = {
 	{"all"   , "winwidth"     , "800"},
 	{"all"   , "winheight"    , "600"},
 	{"all"   , "zoom"         , "1.000"},
@@ -302,20 +311,20 @@ static Conf dconf[] = {
 
 };
 #ifdef MAINC
-static bool confbool(char *key)
+STATIC bool confbool(char *key)
 { return g_key_file_get_boolean(conf, "all", key, NULL); }
-static int confint(char *key)
+STATIC int confint(char *key)
 { return g_key_file_get_integer(conf, "all", key, NULL); }
-static double confdouble(char *key)
+STATIC double confdouble(char *key)
 { return g_key_file_get_double(conf, "all", key, NULL); }
 #endif
-static char *confcstr(char *key)
+STATIC char *confcstr(char *key)
 {//return is static string
 	static char *str;
 	GFA(str, g_key_file_get_string(conf, "all", key, NULL))
 	return str ? *str ? str : NULL : NULL;
 }
-static char *getset(WP *wp, char *key)
+STATIC char *getset(WP *wp, char *key)
 {//return is static string
 	if (!wp)
 	{
@@ -325,12 +334,12 @@ static char *getset(WP *wp, char *key)
 	}
 	return confcstr(key) ?: g_object_get_data(wp->seto, key);
 }
-static bool getsetbool(WP *wp, char *key)
+STATIC bool getsetbool(WP *wp, char *key)
 { return !g_strcmp0(getset(wp, key), "true"); }
-static int getsetint(WP *wp, char *key)
+STATIC int getsetint(WP *wp, char *key)
 { return atoi(getset(wp, key) ?: "0"); }
 #ifdef MAINC
-static char **getsetsplit(WP *wp, char *key)
+STATIC char **getsetsplit(WP *wp, char *key)
 {
 	char *tmp = getset(wp, key);
 	return tmp ? g_strsplit(tmp, ";", -1) : NULL;
@@ -338,20 +347,20 @@ static char **getsetsplit(WP *wp, char *key)
 #endif
 
 
-static char *path2conf(const char *name)
+STATIC char *path2conf(const char *name)
 {
 	return g_build_filename(
 			g_get_user_config_dir(), fullname, name, NULL);
 }
 
-static bool setprop(WP *wp, GKeyFile *kf, char *group, char *key)
+STATIC bool setprop(WP *wp, GKeyFile *kf, char *group, char *key)
 {
 	if (!g_key_file_has_key(kf, group, key, NULL)) return false;
 	char *val = g_key_file_get_string(kf, group, key, NULL);
 	g_object_set_data_full(wp->seto, key, *val ? val : NULL, g_free);
 	return true;
 }
-static void setprops(WP *wp, GKeyFile *kf, char *group)
+STATIC void setprops(WP *wp, GKeyFile *kf, char *group)
 {
 	//sets
 	static int deps;
@@ -384,9 +393,9 @@ static void setprops(WP *wp, GKeyFile *kf, char *group)
 			setprop(wp, kf, group, dconf[i].key);
 }
 
-static GSList *regs;
-static GSList *regsrev;
-static void makeuriregs() {
+STATIC GSList *regs;
+STATIC GSList *regsrev;
+STATIC void makeuriregs() {
 	for (GSList *next = regs; next; next = next->next)
 	{
 		regfree(((void **)next->data)[0]);
@@ -427,10 +436,10 @@ static void makeuriregs() {
 	}
 	g_strfreev(groups);
 
-	for (GSList *next = regsrev; next; next = next->next)
-		regs = g_slist_prepend(regs, next->data);
+	for (GSList *_next = regsrev; _next; _next = _next->next)
+		regs = g_slist_prepend(regs, _next->data);
 }
-static bool eachuriconf(WP *wp, const char* uri, bool lastone,
+STATIC bool eachuriconf(WP *wp, const char* uri, bool lastone,
 		bool (*func)(WP *, const char *uri, char *group))
 {
 	bool ret = false;
@@ -448,13 +457,13 @@ static bool eachuriconf(WP *wp, const char* uri, bool lastone,
 
 	return ret;
 }
-static bool seturiprops(WP *wp, const char *uri, char *group)
+STATIC bool seturiprops(WP *wp, const char *uri, char *group)
 {
 	setprops(wp, conf, group);
 	return true;
 }
 
-static void _resetconf(WP *wp, const char *uri, bool force)
+STATIC void _resetconf(WP *wp, const char *uri, bool force)
 {
 	//clearing. don't worry about reg and handler they are not set
 	if (force || (wp->lasturiconf && g_strcmp0(wp->lasturiconf, uri)))
@@ -475,7 +484,7 @@ static void _resetconf(WP *wp, const char *uri, bool force)
 		g_strfreev(sets);
 	}
 }
-static void initconf(GKeyFile *kf)
+STATIC void initconf(GKeyFile *kf)
 {
 	if (conf) g_key_file_free(conf);
 	conf = kf ?: g_key_file_new();
@@ -571,7 +580,7 @@ static void initconf(GKeyFile *kf)
 
 
 //@misc
-static bool _mkdirif(char *path, bool isfile)
+STATIC bool _mkdirif(char *path, bool isfile)
 {
 	bool ret = false;
 	char *dir = isfile ? g_path_get_dirname(path) : path;
@@ -585,12 +594,12 @@ static bool _mkdirif(char *path, bool isfile)
 
 	return ret;
 }
-static void mkdirif(char *path)
+STATIC void mkdirif(char *path)
 {
 	_mkdirif(path, true);
 }
 
-static char *_escape(const char *str, char *esc)
+STATIC char *_escape(const char *str, char *esc)
 {
 	gulong len = 0;
 	for (const char *c = str; *c; c++)
@@ -621,14 +630,14 @@ static char *_escape(const char *str, char *esc)
 
 	return g_strdup(ret);
 }
-static char *regesc(const char *str)
+STATIC char *regesc(const char *str)
 {
 	return _escape(str, ".?+");
 }
 
 
 //@ipc
-static char *ipcpath(char *name)
+STATIC char *ipcpath(char *name)
 {
 	static char *path;
 	GFA(path, g_build_filename(g_get_user_runtime_dir(), fullname, name, NULL));
@@ -636,8 +645,8 @@ static char *ipcpath(char *name)
 	return path;
 }
 
-static void ipccb(const char *line);
-static gboolean ipcgencb(GIOChannel *ch, GIOCondition c, gpointer p)
+STATIC void ipccb(const char *line);
+STATIC gboolean ipcgencb(GIOChannel *ch, GIOCondition c, gpointer p)
 {
 	char *line;
 //	GError *err = NULL;
@@ -658,7 +667,7 @@ static gboolean ipcgencb(GIOChannel *ch, GIOCondition c, gpointer p)
 	return true;
 }
 
-static bool ipcsend(char *name, char *str) {
+STATIC bool ipcsend(char *name, char *str) {
 	char *path = ipcpath(name);
 	bool ret = false;
 	int cpipe = 0;
@@ -681,7 +690,7 @@ static bool ipcsend(char *name, char *str) {
 	}
 	return ret;
 }
-static void ipcwatch(char *name, GMainContext *ctx) {
+STATIC void ipcwatch(char *name, GMainContext *ctx) {
 	char *path = ipcpath(name);
 
 	if (!g_file_test(path, G_FILE_TEST_EXISTS))
@@ -708,3 +717,5 @@ fprintf_gerror(FILE *stream, GError *gerror, const char *fmt, ...)
 	va_end(ap);
 	return m+n;
 }
+
+
