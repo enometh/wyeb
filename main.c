@@ -4045,7 +4045,7 @@ static void dldatacb(DLWin *win)
 //static void dlrescb(DLWin *win) {}
 
 // set an absolute filename
-static void dlrescb(DLWin *win)
+static void dlrescb(DLWin *win, GParamSpec pspec, gpointer _win)
 {
 	WebKitURIRequest *req = webkit_download_get_request(win->dl);
 	const char *requri = webkit_uri_request_get_uri(req);
@@ -4078,6 +4078,7 @@ static void dlrescb(DLWin *win)
 		g_free(dest);
 		return;
 	}
+	g_message("on notify::response, dlrescb set download destination to %s", uri);
 	webkit_download_set_destination(win->dl, uri);
 	g_free(dest);
 }
