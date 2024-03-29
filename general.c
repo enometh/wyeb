@@ -26,6 +26,8 @@ along with wyeb.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifdef MKCLPLUG
 #define STATIC __attribute__((visibility("default")))
+#else
+#define STATIC static
 #endif
 
 
