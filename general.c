@@ -374,6 +374,7 @@ STATIC void setprops(WP *wp, GKeyFile *kf, char *group)
 STATIC GSList *regs;
 STATIC GSList *regsrev;
 STATIC void makeuriregs() {
+	int i = 0, j = 0;
 	for (GSList *next = regs; next; next = next->next)
 	{
 		regfree(((void **)next->data)[0]);
@@ -387,6 +388,7 @@ STATIC void makeuriregs() {
 	char **groups = g_key_file_get_groups(conf, NULL);
 	for (char **next = groups; *next; next++)
 	{
+		i++;
 		char *gl = *next;
 		if (!g_str_has_prefix(gl, "uri:")) continue;
 
@@ -407,15 +409,20 @@ STATIC void makeuriregs() {
 			g_free(*reg);
 			g_free(reg);
 		} else {
+			j++;
 			reg[1] = g_strdup(gl);
 			regsrev = g_slist_prepend(regsrev, reg);
+//			g_message("makeuriconf: i=%d j=%d uri=%s", i, j, reg[1]);
 		}
 		g_free(tofree);
 	}
 	g_strfreev(groups);
 
+//	g_message("makeuriconf: len(regsrev)=%d", g_slist_length(regsrev));
 	for (GSList *_next = regsrev; _next; _next = _next->next)
 		regs = g_slist_prepend(regs, _next->data);
+//	g_message("makeuriconf: len(regsrev)=%d", g_slist_length(regsrev));
+//	g_message("makeuriconf: len(regs)=%dx", g_slist_length(regs));
 }
 STATIC bool eachuriconf(WP *wp, const char* uri, bool lastone,
 		bool (*func)(WP *, const char *uri, char *group))
