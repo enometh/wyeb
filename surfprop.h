@@ -300,11 +300,11 @@ void surf_cmdprompt(Win *w)
 {
 	char buf[1024];
 	int buflen = sizeof(buf);
-	int pipefd[2], kikefd[2], cpid;
+	int pipefd[2], bikefd[2], cpid;
 	int len, maxlen = -1, nread, pos, i;
 	char *s;
 
-	if (pipe(pipefd) == -1 || pipe(kikefd) == -1) {
+	if (pipe(pipefd) == -1 || pipe(bikefd) == -1) {
 		perror("pipe()");
 		return;
 	}
@@ -314,31 +314,31 @@ void surf_cmdprompt(Win *w)
 		return;
 	}
 
-	if (cpid == 0) { /* child reads from pipe[0] writes to kike[1] */
+	if (cpid == 0) { /* child reads from pipe[0] writes to bike[1] */
 		fflush(stderr);
 
 		close(pipefd[1]);
-		close(kikefd[0]);
+		close(bikefd[0]);
 
 		if (dup2(pipefd[0], STDIN_FILENO) == -1) {
 			perror("dup2");
 			return;
 		}
-		if (dup2(kikefd[1], STDOUT_FILENO) == -1) {
+		if (dup2(bikefd[1], STDOUT_FILENO) == -1) {
 			perror("dup2");
 			return;
 		}
 		close(pipefd[0]);
-		close(kikefd[1]);
+		close(bikefd[1]);
 
 		xwinid = w->sxid;
 		if (execlp("dmenu", "dmenu", "-l", "10",  "-p", "M-x", "-w", xwinid, NULL))
 			perror("execlp(dmenu)");
 	}
 
-	/* Parent writes to pipe[1] and reads from kike[0] */
+	/* Parent writes to pipe[1] and reads from bike[0] */
 	close(pipefd[0]);
-	close(kikefd[1]);
+	close(bikefd[1]);
 
 	static Cmd * pchoices[sizeof(choices)/sizeof(choices[0])];
 	static int pchoices_initialized = 0;
@@ -363,10 +363,10 @@ void surf_cmdprompt(Win *w)
 	wait(NULL); 		/* wait for the child */
 
 	for(pos = 0;
-	    (nread = read(kikefd[0], &buf[pos], buflen - pos)) > 0;
+	    (nread = read(bikefd[0], &buf[pos], buflen - pos)) > 0;
 	    pos += nread);
 
-	close(kikefd[0]);
+	close(bikefd[0]);
 
 	// null terminate buf. this chops off trailing newline if it
 	// fit, and truncates it if it did not fit.
