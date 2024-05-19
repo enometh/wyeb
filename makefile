@@ -17,18 +17,22 @@ else
 endif
 
 # export PKG_CONFIG_PATH appropriately and invoke make with MKCLPLUG=1
-ifdef MKCLPLUG
-	CFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config mkclplug-1 --cflags) -DMKCLPLUG
-	LDFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH)  pkg-config mkclplug-1 --libs)
+WYEBCL =
+ifdef ECLPLUG
+	CFLAGS += -DMKCLPLUG -DWYEB_ECL
+	WYEBCL += eclplug-1
 endif
-
+ifdef MKCLPLUG
+	CFLAGS += -DMKCLPLUG -DWYEB_MKCL
+	WYEBCL += mkclplug-1
+endif
 
 all: wyeb ext.so
 
 wyeb: main.c general.c makefile surfprop.h extraschemes.c readability/readability.c readability/readability.h
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< \
 		-D_GNU_SOURCE \
-		`pkg-config --cflags --libs gtk+-3.0 glib-2.0 $(WEBKIT) gcr-3` \
+		`pkg-config --cflags --libs gtk+-3.0 glib-2.0 $(WEBKIT) gcr-3 $(WYEBCL)` \
 		-DEXTENSION_DIR=\"$(EXTENSION_DIR)$(VERDIR)\" \
 		-DGCR_API_SUBJECT_TO_CHANGE \
 		-DDISTROURI=\"$(DISTROURI)\" \

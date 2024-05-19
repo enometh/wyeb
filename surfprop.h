@@ -234,8 +234,44 @@ cmd_add_security_exception(Win *win, const Arg *a)
 #ifdef MKCLPLUG
 static void
 initmkclplug(Win *win, const Arg *a) {
-	extern void mkcl_initialize(const char *app);
-	mkcl_initialize("mkclplug");
+#if defined(WYEB_ECL) || defined(WYEB_MKCL)
+    enum wyeb_cl_t { wyeb_cl_none, wyeb_cl_default, wyeb_cl_ecl,
+      wyeb_cl_mkcl } wyeb_cl;
+    const char *wyeb_cl_s = g_getenv("WYEB_CL");
+    if (wyeb_cl_s == NULL)
+      wyeb_cl = wyeb_cl_default;
+    else if (g_ascii_strcasecmp(wyeb_cl_s, "none") == 0)
+      wyeb_cl = wyeb_cl_none;
+    else if (g_ascii_strcasecmp(wyeb_cl_s, "ecl") == 0)
+      wyeb_cl = wyeb_cl_ecl;
+    else if (g_ascii_strcasecmp(wyeb_cl_s, "mkcl") == 0)
+      wyeb_cl = wyeb_cl_mkcl;
+    else {
+      fprintf(stderr, "unknown value for env var WYEB_CL: %s. Wanted one of ecl mkcl or none. Treating as none.\n", wyeb_cl_s);
+      wyeb_cl = wyeb_cl_none;
+    }
+    // start with wyeb_cl=none and load at runtime with surfcmd
+    if (a && a->v) {
+	    fprintf(stderr, "initmkclplugin: maybe override %s with %s\n",
+		    (char *) wyeb_cl_s, (char *) a->v);
+	    if (g_ascii_strcasecmp(a->v, "ecl") == 0)
+		    wyeb_cl = wyeb_cl_ecl;
+	    else if (g_ascii_strcasecmp(a->v, "mkcl") == 0)
+		    wyeb_cl = wyeb_cl_mkcl;
+    }
+#if defined(WYEB_ECL)
+    extern void ecl_initialize(char *app);
+    if (wyeb_cl == wyeb_cl_default) wyeb_cl = wyeb_cl_ecl;
+    if (wyeb_cl == wyeb_cl_ecl)
+      ecl_initialize("eclplugtest");
+#endif
+#if defined(WYEB_MKCL)
+    extern void mkcl_initialize(char *app);
+    if (wyeb_cl == wyeb_cl_default) wyeb_cl = wyeb_cl_ecl;
+    if (wyeb_cl == wyeb_cl_mkcl)
+      mkcl_initialize("mkclplugtest");
+#endif
+#endif
 }
 #endif
 
@@ -291,7 +327,12 @@ static Cmd choices[] = {
 	{ "readermode", NULL, { 0 }, "readermode" },
 
 #ifdef MKCLPLUG
-	{ "initmkclplug", initmkclplug, { 0 } },
+#ifdef WYEB_MKCL
+	{ "initmkclplug-mkcl", initmkclplug, { .v = "mkcl" } },
+#endif
+#ifdef WYEB_ECL
+	{ "initmkclplug-ecl", initmkclplug, { .v = "ecl" } },
+#endif
 #endif
 
 };
