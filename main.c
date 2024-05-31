@@ -784,10 +784,15 @@ static void _send(Win *win, Coms type, const char *args, guint64 pageid)
 		}
 	}
 }
-STATIC void send(Win *win, Coms type, const char *args)
+static void send(Win *win, Coms type, const char *args)
 {
 	_send(win, type, args, webkit_web_view_get_page_id(win->kit));
 }
+//;madhu 240531 send has to be static because libdbus calls send(2)
+//and picks up this version
+void send_wrapper(Win *win, Coms type, const char *args) { send(win,type,args); }
+
+
 static void sendeach(Coms type, char *args)
 {
 	char *sent = NULL;
@@ -1108,9 +1113,9 @@ void _kitprops(bool set, GObject *obj, GKeyFile *kf, char *group)
 	}
 }
 
-static void setcss(Win *win, char *namesstr); //declaration
-static void setscripts(Win *win, char *namesstr); //declaration
-static void resetconf(Win *win, const char *uri, int type)
+STATIC void setcss(Win *win, char *namesstr); //declaration
+STATIC void setscripts(Win *win, char *namesstr); //declaration
+STATIC void resetconf(Win *win, const char *uri, int type)
 { //type: 0: uri, 1:force, 2:overset, 3:file
 //	"reldomaindataonly", "removeheaders"
 	char *checks[] = {"reldomaincutheads", "rmnoscripttag", NULL};
@@ -1521,16 +1526,16 @@ normal:
 	else
 		settitle(win, NULL);
 }
-static void tonormal(Win *win)
+STATIC void tonormal(Win *win)
 {
 	win->mode = Mnormal;
 	update(win);
 }
 
-static void eval_javascript(Win *win, const char *script);//declaration
+STATIC void eval_javascript(Win *win, const char *script);//declaration
 
 //@funcs for actions
-static bool run(Win *win, char* action, const char *arg); //declaration
+STATIC bool run(Win *win, char* action, const char *arg); //declaration
 
 static int formaturi(char **uri, char *key, const char *arg, char *spare)
 {
@@ -5609,7 +5614,7 @@ web_view_javascript_finished(GObject      *object,
 	webkit_javascript_result_unref(js_result);
 }
 
-static void
+STATIC void
 eval_javascript(Win *win, const char *script)
 {
 	WebKitSettings *s = webkit_web_view_get_settings(win->kit);
@@ -5636,7 +5641,7 @@ static char *resolvepath(const char *path)
 	return g_build_filename(path, NULL);
 }
 
-static void
+STATIC void
 surfrunscript(Win *win)
 {
 	char *scriptfile = "~/.surf/script.js";

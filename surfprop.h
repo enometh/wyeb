@@ -160,8 +160,8 @@ typedef struct {
 void foo(Win *w, const Arg *a) { fprintf(stderr, "foo: win->sxid=%s\n", w->sxid); }
 
 static void send(Win *win, Coms type, const char *args); // fwd decl
-static void resetconf(Win *, const char*, int);	   //fwd decl
-static void eval_javascript(Win *win, const char *script); //fwd decl
+STATIC void resetconf(Win *, const char*, int);	   //fwd decl
+STATIC void eval_javascript(Win *win, const char *script); //fwd decl
 void w3mmode_set_status(Win *w, const Arg *a) { send(w, Cw3mmode, (char *) a->v); }
 static void viewsourceorheaders(Win *win, viewsourceorheaders_mode flag);
 void cmd_viewsourceorheaders(Win *w, const Arg *a) { viewsourceorheaders(w, a->i); }
