@@ -253,7 +253,7 @@ initmkclplug(Win *win, const Arg *a) {
     // start with wyeb_cl=none and load at runtime with surfcmd
     if (a->v) {
 	    fprintf(stderr, "initmkclplugin: maybe override %s with %s\n",
-		    wyeb_cl_s, a->v);
+		    (char *) wyeb_cl_s, (char *) a->v);
 	    if (g_ascii_strcasecmp(a->v, "ecl") == 0)
 		    wyeb_cl = wyeb_cl_ecl;
 	    else if (g_ascii_strcasecmp(a->v, "mkcl") == 0)
