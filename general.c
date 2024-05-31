@@ -24,10 +24,12 @@ along with wyeb.  If not, see <http://www.gnu.org/licenses/>.
 #include <glib/gstdio.h>
 #include <regex.h>
 
+#ifndef STATIC
 #ifdef MKCLPLUG
 #define STATIC __attribute__((visibility("default")))
 #else
 #define STATIC static
+#endif
 #endif
 
 
@@ -716,6 +718,4 @@ fprintf_gerror(FILE *stream, GError *gerror, const char *fmt, ...)
 	return m+n;
 }
 
-#ifdef MKCLPLUG
-#define STATIC static
-#endif
+
