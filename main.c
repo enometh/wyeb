@@ -229,6 +229,12 @@ static long plugto;
 #define static static
 #endif
 
+#ifdef MKCLPLUG
+#define STATIC __attribute__((visibility("default")))
+#else
+#define STATIC static
+#endif
+
 //shared code
 static void _kitprops(bool set, GObject *obj, GKeyFile *kf, char *group);
 #define MAINC
@@ -424,7 +430,7 @@ static bool isin(GPtrArray *ary, void *v)
 		if (v == ary->pdata[i]) return true;
 	return false;
 }
-static Win *winbyid(const char *pageid)
+STATIC Win *winbyid(const char *pageid)
 {
 	guint64 intid = atol(pageid);
 	Win *maychanged = NULL;
@@ -778,7 +784,7 @@ static void _send(Win *win, Coms type, const char *args, guint64 pageid)
 		}
 	}
 }
-static void send(Win *win, Coms type, const char *args)
+STATIC void send(Win *win, Coms type, const char *args)
 {
 	_send(win, type, args, webkit_web_view_get_page_id(win->kit));
 }
