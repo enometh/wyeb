@@ -430,6 +430,13 @@ static bool isin(GPtrArray *ary, void *v)
 		if (v == ary->pdata[i]) return true;
 	return false;
 }
+
+char* GET_WINID(Win *win)
+{
+  GFA(win->winid, g_strdup_printf("%"G_GUINT64_FORMAT, webkit_web_view_get_page_id(win->kit)));
+  return win->winid;
+}
+
 STATIC Win *winbyid(const char *pageid)
 {
 	guint64 intid = atol(pageid);
@@ -438,7 +445,7 @@ STATIC Win *winbyid(const char *pageid)
 	{
 		Win *win = wins->pdata[i];
 		if (intid == webkit_web_view_get_page_id(win->kit)
-				|| !g_strcmp0(pageid, win->winid))
+				|| !g_strcmp0(pageid, GET_WINID(win) /*win->winid*/))
 			return win;
 
 		if (win->maychanged)
@@ -1798,10 +1805,12 @@ static void envspawn(Spawn *p,
 	snprintf(buf, 9, "%d", wins->len);
 	envp = g_environ_setenv(envp, "WINSLEN", buf, true);
 	envp = g_environ_setenv(envp, "SUFFIX" , *suffix ? suffix : "/", true);
+
 	if (!win->winid)
 		win->winid = g_strdup_printf("%"G_GUINT64_FORMAT,
 				webkit_web_view_get_page_id(win->kit));
-	envp = g_environ_setenv(envp, "WINID"  , win->winid, true);
+	envp = g_environ_setenv(envp, "WINID"  , GET_WINID(win) /*win->winid*/, true);
+
 	envp = g_environ_setenv(envp, "CURRENTSET", win->overset ?: "", true);
 	envp = g_environ_setenv(envp, "URI"    , URI(win), true);
 	envp = g_environ_setenv(envp, "LINK_OR_URI", URI(win), true);
