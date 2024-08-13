@@ -2392,6 +2392,8 @@ static void initpage(WebKitWebExtension *ex, WebKitWebPage *kp)
 
 	loadconf();
 	//workaround this timing the view can not get page id when page is recreated happening on some pages. thus we send it
+
+	g_message("ext.c:initpage: senting pageinit %d\n", getpid());
 	if (send(page, "_pageinit", sfree(g_strdup_printf("%s:%lu",
 						ipcid, webkit_web_page_get_id(kp)))))
 	{
@@ -2417,7 +2419,7 @@ static void initpage(WebKitWebExtension *ex, WebKitWebPage *kp)
 	SIGW(page->kit, "notify::uri"             , uricb    , page);
 //	SIG( page->kit, "form-controls-associated", formcb   , NULL);
 
-
+	g_message("ext.c:exiting initpage %d\n", getpid());
 }
 
 G_MODULE_EXPORT void webkit_web_extension_initialize_with_user_data(
