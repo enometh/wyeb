@@ -2393,7 +2393,17 @@ static void initpage(WebKitWebExtension *ex, WebKitWebPage *kp)
 	loadconf();
 	//workaround this timing the view can not get page id when page is recreated happening on some pages. thus we send it
 
-	g_message("ext.c:initpage: senting pageinit %d\n", getpid());
+	g_message("ext.c:initpage: sending pageinit %d\n", getpid());
+#if 1
+	{
+	  WebKitUserMessage *msg;
+	  msg = webkit_user_message_new("pageinit",
+		g_variant_new( "s",
+			       sfree(g_strdup_printf("%s:%lu",
+						     ipcid, webkit_web_page_get_id(kp)))));
+	  webkit_web_page_send_message_to_view(kp, msg, NULL, NULL, NULL);
+	}
+#else
 	if (send(page, "_pageinit", sfree(g_strdup_printf("%s:%lu",
 						ipcid, webkit_web_page_get_id(kp)))))
 	{
@@ -2412,6 +2422,7 @@ static void initpage(WebKitWebExtension *ex, WebKitWebPage *kp)
 		g_main_loop_unref(page->sync);
 	}
 	page->sync = NULL;
+#endif
 
 //	SIG( page->kit, "context-menu"            , contextcb, NULL);
 	SIG( page->kit, "send-request"            , reqcb    , page);

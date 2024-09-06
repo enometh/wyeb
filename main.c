@@ -6230,6 +6230,34 @@ static gboolean openuricb(void **args)
 	return FALSE;
 }
 
+
+gboolean
+viewusrmsgrcv(WebKitWebView *v, WebKitUserMessage *m, gpointer unused)
+{
+	WebKitUserMessage *r;
+	GUnixFDList *gfd;
+	const char *name;
+	Win *win = unused;
+
+	name = webkit_user_message_get_name(m);
+	if (strcmp(name, "pageinit") != 0) {
+		fprintf(stderr, "wyeb: Unknown UserMessage: %s\n", name);
+		return TRUE;
+	}
+	GVariant *parameters = webkit_user_message_get_parameters (m);
+	if (!parameters)
+	  return;
+	const char *_arg, **_agv;
+	g_variant_get (parameters, "&s", &_arg);
+	g_message("wyeb: pageinit: %s, arg", _arg);
+	_agv = g_strsplit(_arg, ":", 2);
+	win->ipcids = g_slist_prepend(win->ipcids, g_strdup(_agv[0]));
+	//when page proc recreated on some pages, webkit_web_view_get_page_id delays
+	_send(win, Coverset, win->overset, atol(g_strdup(_agv[1])));
+	return TRUE;
+}
+
+
 //@newwin
 Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 {
@@ -6436,6 +6464,9 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 
 	g_object_set_data(win->kito, "win", win);
 	g_object_set_data(win->kito, "caller", caller);
+
+
+	g_signal_connect(G_OBJECT(win->kito), "user-message-received", G_CALLBACK(viewusrmsgrcv), win);
 
 	gtk_window_add_accel_group(win->win, accelg);
 	//workaround. without get_inspector inspector doesen't work
