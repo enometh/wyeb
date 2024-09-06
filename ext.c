@@ -2401,7 +2401,7 @@ static void initpage(WebKitWebExtension *ex, WebKitWebPage *kp)
 		g_variant_new( "s",
 			       sfree(g_strdup_printf("%s:%lu",
 						     ipcid, webkit_web_page_get_id(kp)))));
-	  webkit_web_page_send_message_to_view(kp, msg, NULL, NULL, NULL);
+	  webkit_web_extension_send_message_to_context(ex, msg, NULL, NULL, NULL);
 	}
 #else
 	if (send(page, "_pageinit", sfree(g_strdup_printf("%s:%lu",

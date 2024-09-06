@@ -6232,12 +6232,11 @@ static gboolean openuricb(void **args)
 
 
 gboolean
-viewusrmsgrcv(WebKitWebView *v, WebKitUserMessage *m, gpointer unused)
+viewusrmsgrcv(WebKitWebContext *v, WebKitUserMessage *m, gpointer unused)
 {
 	WebKitUserMessage *r;
 	GUnixFDList *gfd;
 	const char *name;
-	Win *win = unused;
 
 	name = webkit_user_message_get_name(m);
 	if (strcmp(name, "pageinit") != 0) {
@@ -6251,6 +6250,19 @@ viewusrmsgrcv(WebKitWebView *v, WebKitUserMessage *m, gpointer unused)
 	g_variant_get (parameters, "&s", &_arg);
 	g_message("wyeb: pageinit: %s, arg", _arg);
 	_agv = g_strsplit(_arg, ":", 2);
+
+	Win *win = 0;
+	int needle = atol(_agv[1]);
+	for (int i = 0; i < wins->len; i++) {
+	  Win *straw = wins->pdata[i];
+	  if (needle == webkit_web_view_get_page_id(straw->kit))
+	    win = straw;
+	}
+	g_message("viewusrmsgrcv: pageid = %s, win = %p", _agv[1], win);
+	if (!win) {
+	  win = LASTWIN;
+	  g_message("using last win %p", win);
+	}
 	win->ipcids = g_slist_prepend(win->ipcids, g_strdup(_agv[0]));
 	//when page proc recreated on some pages, webkit_web_view_get_page_id delays
 	_send(win, Coverset, win->overset, atol(g_strdup(_agv[1])));
@@ -6318,6 +6330,8 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
                                     "website-data-manager", mgr,
                                     "process-swap-on-cross-site-navigation-enabled", TRUE,
                                     NULL);
+
+		g_signal_connect(G_OBJECT(ctx), "user-message-received", G_CALLBACK(viewusrmsgrcv), NULL);
 
 		proxy_settings_from_conf(); //on creation
 
@@ -6464,9 +6478,6 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 
 	g_object_set_data(win->kito, "win", win);
 	g_object_set_data(win->kito, "caller", caller);
-
-
-	g_signal_connect(G_OBJECT(win->kito), "user-message-received", G_CALLBACK(viewusrmsgrcv), win);
 
 	gtk_window_add_accel_group(win->win, accelg);
 	//workaround. without get_inspector inspector doesen't work
