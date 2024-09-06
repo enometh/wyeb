@@ -6288,7 +6288,7 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 
 		ctx = g_object_new (WEBKIT_TYPE_WEB_CONTEXT,
                                     "website-data-manager", mgr,
-//                                    "process-swap-on-cross-site-navigation-enabled", FALSE,
+                                    "process-swap-on-cross-site-navigation-enabled", TRUE,
                                     NULL);
 
 		proxy_settings_from_conf(); //on creation
