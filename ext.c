@@ -2394,7 +2394,7 @@ static void initpage(WebKitWebExtension *ex, WebKitWebPage *kp)
 	//workaround this timing the view can not get page id when page is recreated happening on some pages. thus we send it
 
 	g_message("ext.c:initpage: sending pageinit %d\n", getpid());
-#if 1
+#if 0
 	{
 	  WebKitUserMessage *msg;
 	  msg = webkit_user_message_new("pageinit",

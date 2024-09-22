@@ -6328,7 +6328,7 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 
 		ctx = g_object_new (WEBKIT_TYPE_WEB_CONTEXT,
                                     "website-data-manager", mgr,
-                                    "process-swap-on-cross-site-navigation-enabled", TRUE,
+                                    "process-swap-on-cross-site-navigation-enabled", FALSE,
                                     NULL);
 
 		g_signal_connect(G_OBJECT(ctx), "user-message-received", G_CALLBACK(viewusrmsgrcv), NULL);
