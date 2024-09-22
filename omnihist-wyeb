@@ -63,6 +63,7 @@ geturi() {
 
 goto() {
 	local -r xid="$1"	# wyeb "suffix"
+	local -r wyebsuffix="$xid"
 	local -r readprop="$2"
 	local -r prop="$3"
 	local -r promptvar="$4"
@@ -86,6 +87,7 @@ goto() {
 	uri="$s"
 
 	wyeb // "$prop" "$uri"
+#	wyeb "$wyebsuffix" "$prop" "$uri"
 	return
 
 	[ -z "$xid" -o -z "$prop" -o -z "$uri" ] && exit 1
