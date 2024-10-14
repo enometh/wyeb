@@ -2667,7 +2667,10 @@ make_savepath(const char *uri, const char *basedir)
 		fprintf(stderr, "make_savepath: bad uri: %s\n", uri);
 		return NULL;
 	}
-	if (strcmp(g_uri_get_scheme(souprequri), "file") == 0) {
+	if (strcmp(g_uri_get_scheme(souprequri), "file") == 0 ||
+	    strcmp(g_uri_get_scheme(souprequri), "about") == 0 ||
+	    strcmp(g_uri_get_scheme(souprequri), "wyeb") == 0)
+	  {
 		fprintf(stderr, "make_savepath: refusing to make a path for a file url %s\n", uri);
 		//g_uri_unref(souprequri);
 		return NULL;
