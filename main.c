@@ -757,6 +757,17 @@ static void _showmsg(Win *win, char *msg)
 static void showmsg(Win *win, const char *msg)
 { _showmsg(win, g_strdup(msg)); }
 
+static void handleusrmsgreply
+(GObject *source, GAsyncResult *res, gpointer data)
+{
+  GError *err = NULL;
+  WebKitUserMessage *m = webkit_web_view_send_message_to_page_finish(WEBKIT_WEB_VIEW(source), res, &err);
+  if (err)
+    fprintf_gerror(stderr, err, "main: handleusrmsgreply: failed");
+ else
+   fprintf(stderr, "main: handlusrmsgreply: %s\n", webkit_user_message_get_name(m));
+}
+
 //com
 static void send(Win *win, Coms type, const char *args)
 {
@@ -764,7 +775,7 @@ static void send(Win *win, Coms type, const char *args)
 		win,type,args);
 	WebKitUserMessage* msg = webkit_user_message_new(
 		sfree(g_strdup_printf("0:%c:%s", type, args ?: "")) , NULL);
-	webkit_web_view_send_message_to_page(win->kit, msg, NULL, NULL, NULL);
+	webkit_web_view_send_message_to_page(win->kit, msg, NULL, handleusrmsgreply, NULL);
 }
 //;madhu 240531 send has to be static because libdbus calls send(2)
 //and picks up this version
@@ -5790,6 +5801,8 @@ static gboolean msgcb(WebKitWebView *k, WebKitUserMessage *msg, Win *win)
 {
 	char **args = g_strsplit(webkit_user_message_get_name(msg), ":", 3);
 	run(win, args[1], !*args[2] ? NULL : args[2]);
+	WebKitUserMessage * r = webkit_user_message_new("ok", NULL);
+	webkit_user_message_send_reply(msg, r);
 	return true;
 }
 //@contextmenu

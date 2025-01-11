@@ -351,6 +351,16 @@ static void recttovals(let rect, double *x, double *y, double *w, double *h)
 }
 
 
+static void handleusrmsgreply
+(GObject *source, GAsyncResult *res, gpointer data)
+{
+  GError *err = NULL;
+  WebKitUserMessage *m = webkit_web_page_send_message_to_view_finish(WEBKIT_WEB_PAGE(source), res, &err);
+  if (err)
+    fprintf_gerror(stderr, err, "ext: handleusrmsgreply: failed");
+ else
+   fprintf(stderr, "ext: handlusrmsgreply: %s\n", webkit_user_message_get_name(m));
+}
 
 //@misc
 static void send(Page *page, char *action, const char *arg)
@@ -358,7 +368,7 @@ static void send(Page *page, char *action, const char *arg)
 	D(send to main %s %s, action, arg)
 	WebKitUserMessage* msg = webkit_user_message_new(
 		sfree(g_strdup_printf("0:%s:%s", action, arg ?: "")) , NULL);
-	webkit_web_page_send_message_to_view(page->kit, msg, NULL, NULL, NULL);
+	webkit_web_page_send_message_to_view(page->kit, msg, NULL, handleusrmsgreply, NULL);
 	fprintf(stderr,"ext send: page=%p action=%s, arg=%s\n", page, action, arg);
 }
 static bool isins(const char **ary, char *val)
@@ -1872,6 +1882,9 @@ static gboolean msgcb(WebKitWebPage *kp, WebKitUserMessage *msg, Page *page)
 	}
 
 	g_strfreev(args);
+
+	WebKitUserMessage *r = webkit_user_message_new("ok", NULL);
+	webkit_user_message_send_reply(msg, r);
 	return true;
 }
 
