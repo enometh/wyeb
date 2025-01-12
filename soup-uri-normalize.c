@@ -10,7 +10,7 @@
 #define XDIGIT(c) ((c) <= '9' ? (c) - '0' : ((c) & 0x4F) - 'A' + 10)
 #define HEXCHAR(s) ((XDIGIT (s[1]) << 4) + XDIGIT (s[2]))
 
-const char soup_char_attributes[];
+extern const char soup_char_attributes[];
 #define SOUP_CHAR_URI_PERCENT_ENCODED 0x01
 #define SOUP_CHAR_URI_GEN_DELIMS      0x02
 #define SOUP_CHAR_URI_SUB_DELIMS      0x04

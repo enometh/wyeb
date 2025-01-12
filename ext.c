@@ -82,9 +82,9 @@ static void loadconf()
 	if (!confpath)
 		confpath = path2conf("main.conf");
 
-	GKeyFile *new = g_key_file_new();
-	g_key_file_load_from_file(new, confpath,G_KEY_FILE_NONE, NULL);
-	initconf(new);
+	GKeyFile *new_ = g_key_file_new();
+	g_key_file_load_from_file(new_, confpath,G_KEY_FILE_NONE, NULL);
+	initconf(new_);
 }
 static void resetconf(Page *page, const char *uri, bool force)
 {
@@ -2050,6 +2050,9 @@ static gboolean reqcb(
 		WebKitURIResponse *res,
 		Page *page)
 {
+int check;
+const char *phost;
+
 	bool ret = false;
 	char *reason="";
 
@@ -2203,7 +2206,7 @@ static gboolean reqcb(
 		}
 	}
 
-	int check = checkwb(NULL, reqstr);
+	check = checkwb(NULL, reqstr);
 	if (check == 0) {
 		reason = "checkwb";
 		ret = true;
@@ -2241,7 +2244,7 @@ static gboolean reqcb(
 
 	//reldomainonly
 	puri = puri ?: g_uri_parse(pagestr, SOUP_HTTP_URI_FLAGS, NULL);
-	const char *phost = g_uri_get_host(puri);
+	phost = g_uri_get_host(puri);
 
 	//g_assert(strcmp(reason,"")==0);
 	if (strcmp(reason,"") != 0) {

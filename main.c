@@ -1158,15 +1158,18 @@ static void prepareif(
 		char **path,
 		char *name, char *initstr, void (*monitorcb)(const char *))
 {
+  GFile *gf;
+  GFileOutputStream *o;
+
 	bool first = !*path;
 	if (first) *path = path2conf(name);
 
 	if (g_file_test(*path, G_FILE_TEST_EXISTS))
 		goto out;
 
-	GFile *gf = g_file_new_for_path(*path);
+	gf = g_file_new_for_path(*path);
 
-	GFileOutputStream *o = g_file_create(
+	o = g_file_create(
 			gf, G_FILE_CREATE_PRIVATE, NULL, NULL);
 	g_output_stream_write((GOutputStream *)o,
 			initstr, strlen(initstr), NULL, NULL);
@@ -1305,9 +1308,9 @@ static void checkconf(const char *mp)
 	}
 	else if (!mp && conf) return; //from focuscb
 
-	GKeyFile *new = g_key_file_new();
+	GKeyFile *new_ = g_key_file_new();
 	GError *err = NULL;
-	g_key_file_load_from_file(new, confpath, G_KEY_FILE_KEEP_COMMENTS, &err);
+	g_key_file_load_from_file(new_, confpath, G_KEY_FILE_KEEP_COMMENTS, &err);
 	if (err)
 	{
 		alert(err->message);
@@ -1317,7 +1320,7 @@ static void checkconf(const char *mp)
 		return;
 	}
 
-	initconf(new);
+	initconf(new_);
 
 	if (ctx)
 	{
@@ -1736,6 +1739,12 @@ static void spawnfree(Spawn* s, bool force)
 static void envspawn(Spawn *p,
 		bool iscallback, char *result, char *piped, gsize plen)
 {
+GError *err;
+const char *title;
+char **envp;
+char *dir;
+
+
 	Win *win = p->win;
 	if (!isin(wins, win)) goto out;
 
@@ -1764,11 +1773,11 @@ static void envspawn(Spawn *p,
 	if (getsetbool(win, "spawnmsg"))
 		_showmsg(win, g_strdup_printf("spawn: %s", p->cmd ?: p->path));
 
-	char *dir = p->cmd ?
+	dir = p->cmd ?
 		(p->path ? g_strdup(p->path) : path2conf("menu"))
 		: g_path_get_dirname(p->path);
 
-	char **envp = g_get_environ();
+	envp = g_get_environ();
 	envp = g_environ_setenv(envp, "ISCALLBACK",
 			iscallback ? "1" : "0", true);
 	envp = g_environ_setenv(envp, "RESULT", result ?: "", true);
@@ -1799,7 +1808,7 @@ static void envspawn(Spawn *p,
 	Z(WINX) Z(WINY) Z(WIDTH) Z(HEIGHT)
 #undef Z
 
-	const char *title = webkit_web_view_get_title(win->kit);
+	title = webkit_web_view_get_title(win->kit);
 	if (!title) title = URI(win);
 	envp = g_environ_setenv(envp, "TITLE" , title, true);
 	envp = g_environ_setenv(envp, "LABEL_OR_TITLE" , title, true);
@@ -1841,7 +1850,7 @@ static void envspawn(Spawn *p,
 
 	int input;
 	GPid child_pid;
-	GError *err = NULL;
+	err = NULL;
 	if (piped ?
 			!g_spawn_async_with_pipes(
 				dir, argv, envp,
@@ -2487,34 +2496,34 @@ togglecookiepolicycb(GObject *mgr, GAsyncResult *res, gpointer _data)
 	struct cookie_policy_action_data * data = (struct cookie_policy_action_data *) _data;
 	enum cookie_policy_action action = data->action;
 	Win *win = data->win;
-	WebKitCookieAcceptPolicy new, current =
+	WebKitCookieAcceptPolicy new_, current =
 		webkit_cookie_manager_get_accept_policy_finish(WEBKIT_COOKIE_MANAGER(mgr), res, NULL);
 	switch(action) {
 	case COOKIES_STATUS:
 		no_set = 1;
 		break;
 	case COOKIES_ON:
-		new = WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS;
+		new_ = WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS;
 		no_set = (current == WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS);
 		break;
 	case COOKIES_OFF:
-		new = WEBKIT_COOKIE_POLICY_ACCEPT_NEVER;
+		new_ = WEBKIT_COOKIE_POLICY_ACCEPT_NEVER;
 		no_set = (current == WEBKIT_COOKIE_POLICY_ACCEPT_NEVER);
 		break;
 	case COOKIES_CYCLE:
 		switch(current) {
 		// TODO: must clear out cookie from being sent
 		case WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS: /* 0 */
-			new = WEBKIT_COOKIE_POLICY_ACCEPT_NEVER;
+			new_ = WEBKIT_COOKIE_POLICY_ACCEPT_NEVER;
 			break;
 		case WEBKIT_COOKIE_POLICY_ACCEPT_NEVER: /* 1 */
-			new = WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY;
+			new_ = WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY;
 			break;
 		case WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY: /* 2 */
-			new = WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS;
+			new_ = WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS;
 			break;
 		default:
-			new = WEBKIT_COOKIE_POLICY_ACCEPT_NEVER;
+			new_ = WEBKIT_COOKIE_POLICY_ACCEPT_NEVER;
 			fprintf(stderr,
 				"unknown current cookie accept policy %d\n",
 				current);
@@ -2535,11 +2544,11 @@ togglecookiepolicycb(GObject *mgr, GAsyncResult *res, gpointer _data)
 	else
 		snprintf(buf, sizeof(buf), "Cookie policy changed from  %s to %s",
 			 cookiepolicystring(current),
-			 cookiepolicystring(new));
+			 cookiepolicystring(new_));
 	showmsg((Win *)win, buf);
 	fprintf(stderr, "%s\n", buf);
 	if (!no_set)
-		webkit_cookie_manager_set_accept_policy(WEBKIT_COOKIE_MANAGER(mgr), new);
+		webkit_cookie_manager_set_accept_policy(WEBKIT_COOKIE_MANAGER(mgr), new_);
 }
 
 #include <utime.h>
@@ -3232,6 +3241,10 @@ parse_hintdata_at(Win *win, int x, int y)
 static Win *newwin(const char *uri, Win *cbwin, Win *caller, int back);
 static bool _run(Win *win, const char* action, const char *arg, char *cdir, char *exarg)
 {
+char *msg;
+bool unset;
+bool arrow;
+
 #define Z(str, func) if (!strcmp(action, str)) {func; goto out;}
 #define ZZ(t1, t2, f) Z(t1, f) Z(t2, f)
 	//D(action %s, action)
@@ -3518,7 +3531,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 		Z("proxymode",
 			// cannot retrieve earlier settings from webkit.
 			WebKitNetworkProxyMode old = proxy_mode;
-			WebKitNetworkProxyMode new;
+			WebKitNetworkProxyMode new_;
 			char *enum_name[3];
 			int statusonly = 0;
 			enum_name[WEBKIT_NETWORK_PROXY_MODE_DEFAULT] = "System";
@@ -3526,11 +3539,11 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 			enum_name[WEBKIT_NETWORK_PROXY_MODE_CUSTOM] = "Custom";
 			if (strcmp(arg, "no_proxy") == 0 ||
 			    strcmp(arg, "none") == 0)
-				new = WEBKIT_NETWORK_PROXY_MODE_NO_PROXY;
+				new_ = WEBKIT_NETWORK_PROXY_MODE_NO_PROXY;
 			else if (strcmp(arg, "default") == 0)
-				new = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
+				new_ = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
 			else if (strcmp(arg, "custom") == 0)
-				new = WEBKIT_NETWORK_PROXY_MODE_CUSTOM;
+				new_ = WEBKIT_NETWORK_PROXY_MODE_CUSTOM;
 			else if (strcmp(arg, "status") == 0) {
 				// unreliable
 				_showmsg(win, g_strdup_printf("proxymode: last known value %d %s",
@@ -3538,26 +3551,26 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 				statusonly = 1;
 			} else {
 				fprintf(stderr, "proxymode: Unknown mode %d. using default\n", old);
-				new = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
+				new_ = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
 			}
 			if (!statusonly) {
-				if (new == WEBKIT_NETWORK_PROXY_MODE_CUSTOM && proxy_settings == NULL) {
+				if (new_ == WEBKIT_NETWORK_PROXY_MODE_CUSTOM && proxy_settings == NULL) {
 					showmsg(win, "proxymode: CUSTOM settings empty. Using default");
-					new = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
+					new_ = WEBKIT_NETWORK_PROXY_MODE_DEFAULT;
 				}
 				WebKitWebContext *ctx = webkit_web_view_get_context(win->kit);
-				if (old != new) {
-					if (new == WEBKIT_NETWORK_PROXY_MODE_DEFAULT ||
-					    new == WEBKIT_NETWORK_PROXY_MODE_NO_PROXY)
-						webkit_web_context_set_network_proxy_settings(ctx, new, NULL);
+				if (old != new_) {
+					if (new_ == WEBKIT_NETWORK_PROXY_MODE_DEFAULT ||
+					    new_ == WEBKIT_NETWORK_PROXY_MODE_NO_PROXY)
+						webkit_web_context_set_network_proxy_settings(ctx, new_, NULL);
 					else
 						// use last known global settings
 						webkit_web_context_set_network_proxy_settings
-							(ctx, new, proxy_settings);
-					proxy_mode = new;
+							(ctx, new_, proxy_settings);
+					proxy_mode = new_;
 				}
-				char *msg = g_strdup_printf("proxymode = %s", enum_name[new]);
-				if (old == new) {
+				char *msg = g_strdup_printf("proxymode = %s", enum_name[new_]);
+				if (old == new_) {
 					GFA(msg, g_strdup_printf("%s (unchanged)", msg));
 				} else {
 					GFA(msg, g_strdup_printf("%s (was %s)", msg, enum_name[old]));
@@ -3654,7 +3667,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 		Z("scrollleft" , pmove(win, GDK_KEY_Left))
 		Z("scrollright", pmove(win, GDK_KEY_Right))
 	}
-	bool arrow = getsetbool(win, "hjkl2arrowkeys");
+	arrow = getsetbool(win, "hjkl2arrowkeys");
 	Z(arrow ? "scrolldown"  : "arrowdown" , putkey(win, GDK_KEY_Down))
 	Z(arrow ? "scrollup"    : "arrowup"   , putkey(win, GDK_KEY_Up))
 	Z(arrow ? "scrollleft"  : "arrowleft" , putkey(win, GDK_KEY_Left))
@@ -3761,7 +3774,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 	Z("setv"        , return run(win, "set", "v"))
 	Z("setscript"   , return run(win, "set", "script"))
 	Z("setimage"    , return run(win, "set", "image"))
-	bool unset = false;
+	unset = false;
 	if (!strcmp(action, "unset"))
 		action = (unset = arg) ? "set" : "setstack";
 	Z("set"         ,
@@ -3885,7 +3898,7 @@ static bool _run(Win *win, const char* action, const char *arg, char *cdir, char
 		(!strcmp(action, "winpos") ? gtk_window_move : gtk_window_resize)
 			(win->win, atoi(*agv), atoi(agv[1] ?: exarg)))
 
-	char *msg = g_strdup_printf("Invalid action! %s arg: %s", action, arg);
+	msg = g_strdup_printf("Invalid action! %s arg: %s", action, arg);
 	showmsg(win, msg);
 	puts(msg);
 	g_free(msg);
@@ -4114,17 +4127,21 @@ static void dldestcb(DLWin *win)
 }
 static gboolean dldecidecb(WebKitDownload *pdl, char *name, DLWin *win)
 {
+char *ext;
+char *org;
+char *path;
+
 	goto skip_set_destination;
-	char *path = g_build_filename(win->dldir, name, NULL);
+	path = g_build_filename(win->dldir, name, NULL);
 
 	if (strcmp(win->dldir, sfree(g_path_get_dirname(path))))
 		GFA(path, g_build_filename(win->dldir, name = "noname", NULL))
 
 	mkdirif(path);
 
-	char *org = g_strdup(path);
+	org = g_strdup(path);
 	//Last ext is duplicated for keeping order and easily rename
-	char *ext = strrchr(org, '.');
+	ext = strrchr(org, '.');
 	if (!ext || ext == org || !*(ext + 1) ||
 			strlen(ext) > 4 + 1) //have not support long ext
 		ext = "";
@@ -4448,6 +4465,8 @@ static void faviconcb(GObject *src, GAsyncResult *res, gpointer p)
 }
 static void schemecb(WebKitURISchemeRequest *req, gpointer p)
 {
+GInputStream *st;
+
 	WebKitWebView *kit = webkit_uri_scheme_request_get_web_view(req);
 	Win *win = kit ? g_object_get_data(G_OBJECT(kit), "win") : NULL;
 	if (win) win->scheme = true;
@@ -4527,7 +4546,7 @@ static void schemecb(WebKitURISchemeRequest *req, gpointer p)
 		len = strlen(data);
 	}
 
-	GInputStream *st = g_memory_input_stream_new_from_data(data, len, g_free);
+	st = g_memory_input_stream_new_from_data(data, len, g_free);
 	webkit_uri_scheme_request_finish(req, st, len, type);
 	g_object_unref(st);
 
@@ -4978,6 +4997,8 @@ static bool cancelmdlr;
 static bool cancel23;
 static gboolean btncb(GtkWidget *w, GdkEventButton *e, Win *win)
 {
+double deltax, deltay;
+
 	win->userreq = true;
 	if (e->type != GDK_BUTTON_PRESS) return cancel23;
 	cancel23 = cancelbtn1r = cancelbtn3r = cancelmdlr = false;
@@ -5030,7 +5051,7 @@ static gboolean btncb(GtkWidget *w, GdkEventButton *e, Win *win)
 		if (!win->lastx && !win->lasty) break;
 		cancel23 = cancelbtn1r = cancelbtn3r = true;
 
-		double deltax = e->x - win->lastx,
+		       deltax = e->x - win->lastx,
 		       deltay = e->y - win->lasty;
 
 		if ((pow(deltax, 2) + pow(deltay, 2)) < thresholdp(win) * 9)
@@ -5504,9 +5525,9 @@ static GtkWidget *createcb(WebKitWebView* k,
 		}
 		else
 		{
-			Win *new = newwin(NULL, win, win, 0);
-			showmsg(new, "Link URL was not set");
-			return new->kitw;
+			Win *new_ = newwin(NULL, win, win, 0);
+			showmsg(new_, "Link URL was not set");
+			return new_->kitw;
 		}
 	else if (!g_strcmp0(handle, "ignore")) showmsg(win, "Create window is ignored");
 	else if (!g_strcmp0(handle, "back"  )) return newwin(NULL, win, win, 1)->kitw;
@@ -6039,6 +6060,9 @@ static gboolean focusincb(Win *win)
 }
 static gboolean entkeycb(GtkWidget *w, GdkEventKey *ke, Win *win)
 {
+int chk;
+char *rm;
+
 	switch (ke->keyval) {
 	case GDK_KEY_m:
 		if (!(ke->state & GDK_CONTROL_MASK)) return false;
@@ -6118,13 +6142,13 @@ static gboolean entkeycb(GtkWidget *w, GdkEventKey *ke, Win *win)
 	case GDK_KEY_t:
 		if (pos == 0) pos++;
 		gtk_editable_set_position(e, -1);
-		int chk = gtk_editable_get_position(e);
+		chk = gtk_editable_get_position(e);
 		if (chk < 2)
 			break;
 		if (chk == pos)
 			pos--;
 
-		char *rm = gtk_editable_get_chars(e, pos - 1, pos);
+		rm = gtk_editable_get_chars(e, pos - 1, pos);
 		          gtk_editable_delete_text(e, pos - 1, pos);
 		gtk_editable_insert_text(e, rm, -1, &pos);
 		gtk_editable_set_position(e, pos);

@@ -232,6 +232,16 @@ cmd_add_security_exception(Win *win, const Arg *a)
 
 
 #ifdef MKCLPLUG
+#ifdef __cplusplus
+extern "C" {
+#endif
+  extern void ecl_initialize(char *app);
+  extern void mkcl_initialize(char *app);
+#ifdef __cplusplus
+}
+#endif
+
+
 static void
 initmkclplug(Win *win, const Arg *a) {
 #if defined(WYEB_ECL) || defined(WYEB_MKCL)
@@ -260,13 +270,13 @@ initmkclplug(Win *win, const Arg *a) {
 		    wyeb_cl = wyeb_cl_mkcl;
     }
 #if defined(WYEB_ECL)
-    extern void ecl_initialize(char *app);
+    //extern void ecl_initialize(char *app);
     if (wyeb_cl == wyeb_cl_default) wyeb_cl = wyeb_cl_ecl;
     if (wyeb_cl == wyeb_cl_ecl)
       ecl_initialize("eclplugtest");
 #endif
 #if defined(WYEB_MKCL)
-    extern void mkcl_initialize(char *app);
+    //extern void mkcl_initialize(char *app);
     if (wyeb_cl == wyeb_cl_default) wyeb_cl = wyeb_cl_ecl;
     if (wyeb_cl == wyeb_cl_mkcl)
       mkcl_initialize("mkclplugtest");

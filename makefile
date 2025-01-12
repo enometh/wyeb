@@ -16,6 +16,8 @@ else
 	CFLAGS += -Wno-deprecated-declarations
 endif
 
+#CFLAGS += -fpermissive -std=c++11 -Wno-literal-suffix -Wno-write-strings
+
 # export PKG_CONFIG_PATH appropriately and invoke make with MKCLPLUG=1
 WYEBCL =
 ifdef ECLPLUG
