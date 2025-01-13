@@ -2058,7 +2058,7 @@ const char *phost;
 
 	page->pagereq++;
 	const char *reqstr = webkit_uri_request_get_uri(req);
-	D(reqcb %s, reqstr)
+//	D(reqcb %s, reqstr)
 
 	if (offline) return true;
 
