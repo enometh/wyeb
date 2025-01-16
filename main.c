@@ -2746,6 +2746,68 @@ savesourcecb(GObject *res, GAsyncResult *result, gpointer user_data)
 	g_free(dest);
 }
 
+void
+vsh_savesourcecb(GObject *obj, GAsyncResult *result, gpointer user_data)
+{
+  GError *gerror = NULL;
+  GFile *gfile=G_FILE(obj);
+  char *dest = (char *) user_data;
+  gboolean ret = g_file_replace_contents_finish(gfile, result, NULL, &gerror);
+  if (!ret)
+    fprintf_gerror(stderr, gerror, "vsh_savesourcecb: error saving: %s\n",dest);
+  else fprintf(stderr, "vsh_savesourceb: saved %s\n", dest);
+  g_object_unref(gfile);
+  if (dest) g_free(dest);
+}
+
+gboolean
+vsh_savesource(Win *win)
+{
+  if (win->v.uri && !g_strcmp0(win->v.uri, webkit_web_view_get_uri(win->kit))) {
+      char *dest = make_savepath(win->v.uri, dldir(NULL));
+      if (!dest) {
+	fprintf(stderr, "vsh_savesource: no target path\n");
+	return false;
+      }
+      else if (g_file_test(dest, G_FILE_TEST_EXISTS)) {
+	fprintf(stderr, "vsh_savesource: not overwriting %s\n", dest);
+	g_free(dest);
+	return false;
+      }
+      GFile *gfile = g_file_new_for_path(dest);
+      g_file_replace_contents_bytes_async
+	(gfile, win->v.source, NULL, false, //XXX
+	 G_FILE_CREATE_NONE, NULL, vsh_savesourcecb, dest);
+
+      gsize len = 0;
+      gconstpointer data = g_bytes_get_data (win->v.headers, &len);
+      if (len != 0) {
+	char *header_dest = g_strconcat(dest, ".headers", NULL);
+	GFile *gfile_headers = g_file_new_for_path(header_dest);
+	GError *gerror = NULL;
+	gboolean ret = g_file_replace_contents
+	  (gfile_headers, (char *)data, len, NULL, false, //XXX
+	   G_FILE_CREATE_NONE, NULL, NULL, &gerror);
+	if (!ret)
+	  fprintf_gerror(stderr, gerror, "vsh_savesource: error saving: %s\n", header_dest);
+	else
+	  fprintf(stderr, "vsh_savesource: saved %s\n", header_dest);
+	g_object_unref(gfile_headers);
+	if (header_dest) g_free(header_dest);
+	return true;
+      } else {
+	fprintf(stderr, "vsh_savesource: no headers for %s\n", win->v.uri);
+	return false;
+      }
+      return true;
+  } else {
+    fprintf(stderr, "vsh_savesource: mismatch win->v.uri %s wk uri %s\n",
+	    win->v.uri,
+	    webkit_web_view_get_uri(win->kit));
+    return false;
+  }
+}
+
 void vsh_clear(Win *win)
 {
 	g_free(win->v.uri); win->v.uri = NULL;
@@ -3128,6 +3190,7 @@ static Keybind dkeys[]= {
 	{"applystyle"    , 0, 0, "Apply a css stylesheet"},
 
 	{"selectall"     , 'a', GDK_CONTROL_MASK, "SelectAll"},
+	{"vsh_savesource"     , 'A', GDK_CONTROL_MASK, "vsh save source"},
 
 //todo pagelist
 //	{"windowimage"   , 0, 0}, //winid
@@ -3831,6 +3894,10 @@ bool arrow;
 	  cbdata.win = win;
 	  cbdata.action = COOKIES_CYCLE;
 	  webkit_cookie_manager_get_accept_policy(mgr, NULL, togglecookiepolicycb, &cbdata))
+
+        Z("vsh_savesource",
+	  vsh_savesource(win)
+	  )
 
 	Z("savesource",
 	  WebKitWebResource *res = webkit_web_view_get_main_resource(win->kit);
