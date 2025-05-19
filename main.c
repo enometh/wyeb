@@ -6346,8 +6346,10 @@ Win *newwin(const char *uri, Win *cbwin, Win *caller, int back)
 					sfree(path2conf("cookies")),
 					WEBKIT_COOKIE_PERSISTENT_STORAGE_TEXT);
 
+#if 0
 		webkit_cookie_manager_set_accept_policy(cookiemgr,
 				WEBKIT_COOKIE_POLICY_ACCEPT_NEVER);
+#endif
 
 		if (g_key_file_get_boolean(conf, "boot", "multiwebprocs", NULL))
 			webkit_web_context_set_process_model(ctx,
