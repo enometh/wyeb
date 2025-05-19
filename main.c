@@ -2504,7 +2504,8 @@ togglecookiepolicycb(GObject *mgr, GAsyncResult *res, gpointer _data)
 		break;
 	case COOKIES_ON:
 		new_ = WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS;
-		no_set = (current == WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS);
+		no_set = (current == WEBKIT_COOKIE_POLICY_ACCEPT_ALWAYS) ||
+			(current == WEBKIT_COOKIE_POLICY_ACCEPT_NO_THIRD_PARTY);
 		break;
 	case COOKIES_OFF:
 		new_ = WEBKIT_COOKIE_POLICY_ACCEPT_NEVER;
