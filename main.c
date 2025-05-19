@@ -6869,8 +6869,7 @@ int main(int argc, char **argv)
 
 	if (_run(NULL, action, uri, cwd, *exarg ? exarg : NULL)) {
 #ifdef MKCLPLUG
-	if (!(g_strcmp0(g_getenv("WYEB_CL"),"none") == 0))
-		initmkclplug(NULL, NULL);
+	  initmkclplug(NULL, NULL);
 #endif
 		gtk_main();
 	} else
