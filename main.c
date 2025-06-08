@@ -1317,11 +1317,12 @@ static void checkconf(const char *mp)
 		g_error_free(err);
 		if (!conf)
 			initconf(NULL);
-		return;
+		goto continue_conf;
 	}
 
 	initconf(new_);
 
+ continue_conf:
 	if (ctx)
 	{
 		webkit_web_context_set_tls_errors_policy(ctx,
