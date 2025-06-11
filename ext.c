@@ -2280,8 +2280,10 @@ out:
 
 	if (!ret && head)
 	{
+#if 0
 		soup_message_headers_remove(head, "Upgrade-Insecure-Requests");
 		soup_message_headers_remove(head, "Referer");
+#endif
 
 		if (/*page->pagereq == 1 &&*/(page->setagent || page->setagentprev))
 			soup_message_headers_replace(head, "User-Agent",
