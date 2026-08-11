@@ -71,6 +71,12 @@ typedef struct {
 
 typedef struct _Spawn Spawn;
 
+typedef struct {
+  GtkPrintSettings *settings;
+  WebKitPrintOperation *operation;
+  GtkPageSetup *setup;
+} printrec;
+
 typedef struct _WP {
 	union {
 		GtkWindow *win;
@@ -182,6 +188,7 @@ typedef struct _WP {
 
 	viewsourceorheader_info v;
 	Adj * page_adj;
+	printrec prec;
 } Win;
 
 struct _Spawn {
@@ -3112,6 +3119,7 @@ static Keybind dkeys[]= {
 	{"surffind"	 , '/', GDK_CONTROL_MASK},
 	{"savemhtml"	 , 'S', GDK_CONTROL_MASK},
 	{"savesource"	 , 'd', GDK_CONTROL_MASK},
+	{"print"         , GDK_KEY_Print, 0},
 	{"viewsource"	 , '\\', 0},
 	{"viewheaders"	 , '=', GDK_CONTROL_MASK},
 
@@ -3301,6 +3309,24 @@ parse_hintdata_at(Win *win, int x, int y)
 #define AUTOMATION_CBWIN (void *)0x01
 
 #include "extraschemes.c"	/* for setcontentfiler, also see schemecb below */
+
+
+static void print_dispose(Win *win) {
+  g_clear_object(&(win->prec.settings));
+  g_clear_object(&(win->prec.operation));
+  g_clear_object(&(win->prec.setup));
+}
+
+static void print_finished(WebKitPrintOperation *print_operation, gpointer user_data) {
+  showmsg(user_data, "Print finished");
+  print_dispose(user_data);
+}
+
+static void print_failed(WebKitPrintOperation *print_operation, gpointer user_data) {
+  showmsg(user_data, "Print failed");
+  print_dispose(user_data);
+}
+
 
 //declaration
 static Win *newwin(const char *uri, Win *cbwin, Win *caller, int back);
@@ -3896,6 +3922,22 @@ bool arrow;
 	  cbdata.win = win;
 	  cbdata.action = COOKIES_CYCLE;
 	  webkit_cookie_manager_get_accept_policy(mgr, NULL, togglecookiepolicycb, &cbdata))
+
+
+	Z("print",
+	  win->prec.operation = webkit_print_operation_new (win->kit);
+	  g_signal_connect(win->prec.operation, "finished", G_CALLBACK(print_finished),win);
+	  g_signal_connect(win->prec.operation, "failed", G_CALLBACK(print_failed),win);
+	  win->prec.setup = gtk_page_setup_new ();
+	  gtk_page_setup_set_orientation(win->prec.setup, GTK_PAGE_ORIENTATION_PORTRAIT);
+	  webkit_print_operation_set_page_setup(win->prec.operation, win->prec.setup);
+	  win->prec.settings = gtk_print_settings_new ();
+	  gtk_print_settings_set (win->prec.settings,
+				  GTK_PRINT_SETTINGS_OUTPUT_BASENAME,
+				  webkit_web_view_get_title (win->kit));
+	  webkit_print_operation_set_print_settings (win->prec.operation, win->prec.settings);
+	  webkit_print_operation_run_dialog (win->prec.operation, win->win);
+	  )
 
         Z("vsh_savesource",
 	  vsh_savesource(win)
